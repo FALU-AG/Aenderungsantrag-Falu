@@ -112,6 +112,12 @@ model MachineType {
   requests  ChangeRequest[]
 }
 
+model ChangeRequestCounter {
+  year       Int      @id
+  nextNumber Int      @default(1)
+  updatedAt  DateTime @updatedAt
+}
+
 model ChangeReason {
   id        String                @id @default(cuid())
   key       String                @unique
@@ -125,12 +131,12 @@ model ChangeReason {
 model ChangeRequest {
   id                 String                @id @default(cuid())
   number             String                @unique
-  title              String
+  title              String                @default("")
   applicantId        String
-  machineTypeId      String
+  machineTypeId      String?
   articleNumber      String?
   articleDescription String?
-  description        String
+  description        String                @default("")
   otherReasonText    String?
   status             ChangeRequestStatus   @default(DRAFT)
   approvalCycle      Int                   @default(1)
@@ -142,7 +148,7 @@ model ChangeRequest {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   applicant          User                  @relation("Applicant", fields: [applicantId], references: [id])
-  machineType        MachineType           @relation(fields: [machineTypeId], references: [id])
+  machineType        MachineType?          @relation(fields: [machineTypeId], references: [id])
   closedBy           User?                 @relation("ClosedBy", fields: [closedById], references: [id])
   reasons            ChangeRequestReason[]
   approvals          Approval[]

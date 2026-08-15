@@ -1,6 +1,6 @@
 # Falu Change Request
 
-Interne Webanwendung der Falu AG für den vollständigen Lebenszyklus von Änderungsanträgen. Dieses Repository enthält Phase 1: technische Grundlage, Datenmodell, Prototyp-Identität, Berechtigungen, Audit-Architektur und Anwendungsshell.
+Interne Webanwendung der Falu AG für den vollständigen Lebenszyklus von Änderungsanträgen. Enthalten sind die technische Grundlage sowie die Phase-2-Antragsaufnahme: Entwürfe, Einreichung, Anhänge, Suche, Filter, Detailansicht und Audit-Historie.
 
 ## Voraussetzungen
 
@@ -71,3 +71,12 @@ Der aktuelle `SampleIdentityProvider` verwendet ein HTTP-only Cookie und feste B
 Geschäftsmutationen sollen `withAudit` verwenden. Dadurch werden Datenänderung und Audit-Eintrag in derselben Datenbanktransaktion gespeichert. Eingereichte und abgeschlossene Datensätze werden in späteren Phasen nur archiviert beziehungsweise gesperrt, niemals hart gelöscht.
 
 Anhänge werden im Prototyp künftig unter `storage/` abgelegt; der Ordner ist von Git ausgeschlossen. Metadaten liegen in PostgreSQL.
+
+## Phase-2-Routen
+
+- `/change-requests`: Liste, Suche, Filter, Sortierung und Pagination
+- `/change-requests/new`: neuer Entwurf oder direkte Einreichung
+- `/change-requests/[id]`: Übersicht, Anhänge und Historie
+- `/change-requests/[id]/edit`: Bearbeitung eigener Entwürfe mit Versionsprüfung
+
+Antragsnummern werden beim ersten Speichern serverseitig über einen jährlichen, transaktional aktualisierten Nummernkreis erzeugt. Eine Einreichung erzeugt automatisch die ausstehenden AVOR- und Technik-Freigaben. Lokale Anhänge sind auf PDF, PNG, JPEG, DOCX und XLSX mit maximal 20 MB pro Datei beschränkt.

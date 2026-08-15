@@ -5,7 +5,7 @@ export type AuthUser = {
   id: string;
   name: string;
   email: string;
-  roles: RoleKey[];
+  roles: readonly RoleKey[];
 };
 
 export interface IdentityProvider {

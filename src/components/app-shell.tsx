@@ -5,7 +5,7 @@ import { UserSwitcher } from "./user-switcher";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: Gauge },
-  { href: "/aenderungsantraege", label: "Änderungsanträge", icon: ClipboardList },
+  { href: "/change-requests", label: "Änderungsanträge", icon: ClipboardList },
   { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: ListTodo },
   { href: "/administration", label: "Administration", icon: Settings },
 ];

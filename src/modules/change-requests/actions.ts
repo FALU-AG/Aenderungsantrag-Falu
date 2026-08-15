@@ -1,0 +1,98 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { db } from "@/server/db/client";
+import { getCurrentUser } from "@/modules/auth";
+import { requirePermission } from "@/modules/authorization/permissions";
+import { formDataToInput, draftSchema, submissionSchema } from "./validation";
+import { generateChangeRequestNumber } from "./numbering";
+import { requireDraftEdit } from "./authorization";
+import { removeAttachmentFile, storeAttachment } from "@/server/storage/local-storage";
+import { submissionData } from "./submission";
+
+export type FormState = { errors?: Record<string, string[]>; message?: string };
+const errorsOf = (error: { flatten(): { fieldErrors: Record<string, string[]> } }): FormState => ({ errors: error.flatten().fieldErrors });
+
+export async function saveChangeRequest(_state: FormState, formData: FormData): Promise<FormState> {
+  const user = await getCurrentUser(); requirePermission(user, "CHANGE_REQUEST_CREATE");
+  const intent = String(formData.get("intent")); const input = formDataToInput(formData);
+  const other = await db.changeReason.findFirst({ where: { isOther: true, active: true }, select: { id: true } });
+  const parsed = (intent === "submit" ? submissionSchema(other?.id) : draftSchema).safeParse(input);
+  if (!parsed.success) return errorsOf(parsed.error);
+  const id = String(formData.get("id") ?? "");
+  let requestId = id;
+
+  await db.$transaction(async (tx) => {
+    if (id) {
+      const existing = await tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { applicantId: true, status: true, version: true } });
+      requireDraftEdit(user, existing);
+      const updated = await tx.changeRequest.updateMany({ where: { id, version: parsed.data.version, status: "DRAFT" }, data: {
+        title: parsed.data.title, machineTypeId: parsed.data.machineTypeId || null, articleNumber: parsed.data.articleNumber || null,
+        articleDescription: parsed.data.articleDescription || null, description: parsed.data.description, otherReasonText: parsed.data.otherReasonText || null, version: { increment: 1 },
+      } });
+      if (updated.count !== 1) throw new Error("Der Antrag wurde zwischenzeitlich geändert. Laden Sie die Seite neu.");
+      await tx.changeRequestReason.deleteMany({ where: { changeRequestId: id } });
+      if (parsed.data.reasonIds.length) await tx.changeRequestReason.createMany({ data: parsed.data.reasonIds.map((changeReasonId) => ({ changeRequestId: id, changeReasonId })) });
+      await tx.auditEvent.create({ data: { changeRequestId: id, userId: user.id, action: "CHANGE_REQUEST_UPDATED", entityType: "ChangeRequest", entityId: id, summary: "Entwurf aktualisiert", details: { version: existing.version + 1 } } });
+    } else {
+      const number = await generateChangeRequestNumber(tx);
+      const created = await tx.changeRequest.create({ data: {
+        number, title: parsed.data.title, applicantId: user.id, machineTypeId: parsed.data.machineTypeId || null,
+        articleNumber: parsed.data.articleNumber || null, articleDescription: parsed.data.articleDescription || null,
+        description: parsed.data.description, otherReasonText: parsed.data.otherReasonText || null,
+        reasons: { create: parsed.data.reasonIds.map((changeReasonId) => ({ changeReasonId })) },
+      } }); requestId = created.id;
+      await tx.auditEvent.create({ data: { changeRequestId: created.id, userId: user.id, action: "CHANGE_REQUEST_CREATED", entityType: "ChangeRequest", entityId: created.id, summary: `Änderungsantrag ${number} als Entwurf erstellt` } });
+    }
+    if (intent === "submit") {
+      const submission = submissionData();
+      await tx.changeRequest.update({ where: { id: requestId }, data: { ...submission.request, version: { increment: 1 } } });
+      await tx.approval.createMany({ data: submission.approvals.map((approval) => ({ changeRequestId: requestId, ...approval })) });
+      await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, ...submission.audit, entityType: "ChangeRequest", entityId: requestId, details: { status: "UNDER_REVIEW", approvalCycle: 1 } } });
+    }
+  });
+
+  const files = formData.getAll("attachments").filter((item): item is File => item instanceof File && item.size > 0);
+  for (const file of files) await uploadAttachmentForRequest(requestId, user.id, file);
+  revalidatePath("/"); revalidatePath("/change-requests"); redirect(`/change-requests/${requestId}`);
+}
+
+async function uploadAttachmentForRequest(requestId: string, userId: string, file: File) {
+  const key = await storeAttachment(file);
+  await db.$transaction(async (tx) => {
+    const attachment = await tx.attachment.create({ data: { changeRequestId: requestId, originalName: file.name, storageKey: key, mimeType: file.type, sizeBytes: file.size, uploadedById: userId } });
+    await tx.auditEvent.create({ data: { changeRequestId: requestId, userId, action: "ATTACHMENT_UPLOADED", entityType: "Attachment", entityId: attachment.id, summary: `Anhang «${file.name}» hochgeladen`, details: { sizeBytes: file.size, mimeType: file.type } } });
+  });
+}
+
+export async function uploadAttachment(requestId: string, formData: FormData) {
+  const user = await getCurrentUser(); const request = await db.changeRequest.findUniqueOrThrow({ where: { id: requestId }, select: { applicantId: true, status: true } }); requireDraftEdit(user, request);
+  const file = formData.get("file"); if (!(file instanceof File)) throw new Error("Keine Datei ausgewählt.");
+  await uploadAttachmentForRequest(requestId, user.id, file); revalidatePath(`/change-requests/${requestId}`);
+}
+
+export async function removeAttachment(attachmentId: string) {
+  const user = await getCurrentUser(); const attachment = await db.attachment.findUniqueOrThrow({ where: { id: attachmentId }, include: { changeRequest: { select: { id: true, applicantId: true, status: true } } } }); requireDraftEdit(user, attachment.changeRequest);
+  await db.$transaction(async (tx) => {
+    await tx.attachment.update({ where: { id: attachmentId }, data: { deletedAt: new Date() } });
+    await tx.auditEvent.create({ data: { changeRequestId: attachment.changeRequest.id, userId: user.id, action: "ATTACHMENT_REMOVED", entityType: "Attachment", entityId: attachmentId, summary: `Anhang «${attachment.originalName}» entfernt` } });
+  });
+  await removeAttachmentFile(attachment.storageKey); revalidatePath(`/change-requests/${attachment.changeRequest.id}`);
+}
+
+export async function submitExistingRequest(requestId: string) {
+  const user = await getCurrentUser();
+  const request = await db.changeRequest.findUniqueOrThrow({ where: { id: requestId }, include: { reasons: true } });
+  requireDraftEdit(user, request);
+  const other = await db.changeReason.findFirst({ where: { isOther: true, active: true }, select: { id: true } });
+  submissionSchema(other?.id).parse({ title: request.title, machineTypeId: request.machineTypeId ?? "", articleNumber: request.articleNumber ?? "", articleDescription: request.articleDescription ?? "", reasonIds: request.reasons.map((reason) => reason.changeReasonId), otherReasonText: request.otherReasonText ?? "", description: request.description, version: request.version });
+  const submission = submissionData();
+  await db.$transaction(async (tx) => {
+    const updated = await tx.changeRequest.updateMany({ where: { id: requestId, version: request.version, status: "DRAFT" }, data: { ...submission.request, version: { increment: 1 } } });
+    if (updated.count !== 1) throw new Error("Der Antrag wurde zwischenzeitlich geändert. Laden Sie die Seite neu.");
+    await tx.approval.createMany({ data: submission.approvals.map((approval) => ({ changeRequestId: requestId, ...approval })) });
+    await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, ...submission.audit, entityType: "ChangeRequest", entityId: requestId, details: { status: "UNDER_REVIEW", approvalCycle: 1 } } });
+  });
+  revalidatePath("/"); revalidatePath("/change-requests"); redirect(`/change-requests/${requestId}`);
+}
