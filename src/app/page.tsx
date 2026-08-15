@@ -1,69 +1,24 @@
-import Image from "next/image";
+import { AlertTriangle, ClipboardCheck, Clock3, Cog, Wrench } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { PageHeading } from "@/components/page-heading";
+import { StatusBadge } from "@/components/status-badge";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+const kpis = [
+  { label: "Offene Änderungsanträge", value: "–", icon: ClipboardCheck },
+  { label: "Warten auf AVOR", value: "–", icon: Clock3 },
+  { label: "Warten auf Technik", value: "–", icon: Wrench },
+  { label: "In Umsetzung", value: "–", icon: Cog },
+  { label: "Überfällige Aufgaben", value: "–", icon: AlertTriangle },
+];
+
+export default function DashboardPage() {
+  return <><PageHeading title="Dashboard" description="Überblick über Änderungsanträge, Freigaben und offene Arbeiten." />
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Kennzahlen">
+      {kpis.map(({ label, value, icon: Icon }) => <Card key={label} className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-slate-600">{label}</p><p className="mt-3 text-3xl font-bold text-slate-950">{value}</p></div><span className="rounded-md bg-slate-100 p-2 text-[#175f91]"><Icon className="size-5" /></span></div></Card>)}
+    </section>
+    <Card className="mt-7 overflow-hidden"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">Zuletzt aktualisiert</h2><p className="mt-0.5 text-sm text-slate-500">Beispieldarstellung für die kommende Antragsübersicht</p></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Nummer</th><th className="px-5 py-3">Titel</th><th className="px-5 py-3">Maschinentyp</th><th className="px-5 py-3">Status</th></tr></thead><tbody><tr className="border-t border-slate-100"><td className="px-5 py-5 text-slate-500" colSpan={4}>Noch keine Änderungsanträge vorhanden.</td></tr></tbody></table></div>
+    </Card>
+    <div className="mt-6 flex flex-wrap gap-2" aria-label="Verfügbare Status"><StatusBadge status="DRAFT" /><StatusBadge status="UNDER_REVIEW" /><StatusBadge status="CHANGES_REQUESTED" /><StatusBadge status="APPROVED_FOR_IMPLEMENTATION" /></div>
+  </>;
 }

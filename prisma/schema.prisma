@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApprovalType {
+  AVOR
+  TECHNICAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ChangeRequestStatus {
+  DRAFT
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED_FOR_IMPLEMENTATION
+  IMPLEMENTATION
+  AVOR_PRODUCTION_PREPARATION
+  PURCHASING_PROCUREMENT
+  FINAL_REVIEW
+  CLOSED
+}
+
+enum ReviewAnswer {
+  YES
+  NO
+  NOT_RELEVANT
+}
+
+enum Department {
+  TECHNICAL
+  AVOR
+  PURCHASING
+  PRODUCTION_ASSEMBLY
+  AUTOMATION_SOFTWARE
+  SERVICE
+  SALES
+  OTHER
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  department        Department?
+  active            Boolean            @default(true)
+  externalId        String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  roles             UserRole[]
+  requests          ChangeRequest[]    @relation("Applicant")
+  approvals         Approval[]         @relation("ApprovalDecisionUser")
+  technicalReviews  TechnicalReview[]  @relation("TechnicalReviewCompletedBy")
+  avorReviews       AvorImpactReview[] @relation("AvorReviewCompletedBy")
+  purchasingReviews PurchasingReview[] @relation("PurchasingReviewCompletedBy")
+  assignedTasks     Task[]             @relation("TaskResponsible")
+  createdTasks      Task[]             @relation("TaskCreator")
+  completedTasks    Task[]             @relation("TaskCompleter")
+  attachments       Attachment[]
+  comments          Comment[]
+  auditEvents       AuditEvent[]
+  closedRequests    ChangeRequest[]    @relation("ClosedBy")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  key         String     @unique
+  name        String
+  description String?
+  userRoles   UserRole[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model MachineType {
+  id        String          @id @default(cuid())
+  code      String          @unique
+  name      String
+  active    Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  requests  ChangeRequest[]
+}
+
+model ChangeReason {
+  id        String                @id @default(cuid())
+  key       String                @unique
+  label     String
+  isOther   Boolean               @default(false)
+  active    Boolean               @default(true)
+  sortOrder Int
+  requests  ChangeRequestReason[]
+}
+
+model ChangeRequest {
+  id                 String                @id @default(cuid())
+  number             String                @unique
+  title              String
+  applicantId        String
+  machineTypeId      String
+  articleNumber      String?
+  articleDescription String?
+  description        String
+  otherReasonText    String?
+  status             ChangeRequestStatus   @default(DRAFT)
+  approvalCycle      Int                   @default(1)
+  version            Int                   @default(1)
+  submittedAt        DateTime?
+  closedAt           DateTime?
+  closedById         String?
+  closingRemarks     String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  applicant          User                  @relation("Applicant", fields: [applicantId], references: [id])
+  machineType        MachineType           @relation(fields: [machineTypeId], references: [id])
+  closedBy           User?                 @relation("ClosedBy", fields: [closedById], references: [id])
+  reasons            ChangeRequestReason[]
+  approvals          Approval[]
+  technicalReview    TechnicalReview?
+  avorImpactReview   AvorImpactReview?
+  purchasingReview   PurchasingReview?
+  tasks              Task[]
+  attachments        Attachment[]
+  comments           Comment[]
+  auditEvents        AuditEvent[]
+
+  @@index([status])
+  @@index([machineTypeId])
+  @@index([applicantId])
+  @@index([updatedAt])
+}
+
+model ChangeRequestReason {
+  changeRequestId String
+  changeReasonId  String
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id], onDelete: Cascade)
+  changeReason    ChangeReason  @relation(fields: [changeReasonId], references: [id])
+
+  @@id([changeRequestId, changeReasonId])
+}
+
+model Approval {
+  id              String         @id @default(cuid())
+  changeRequestId String
+  type            ApprovalType
+  status          ApprovalStatus @default(PENDING)
+  cycle           Int
+  decisionUserId  String?
+  decidedAt       DateTime?
+  comment         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  changeRequest   ChangeRequest  @relation(fields: [changeRequestId], references: [id])
+  decisionUser    User?          @relation("ApprovalDecisionUser", fields: [decisionUserId], references: [id])
+
+  @@unique([changeRequestId, type, cycle])
+  @@index([status, type])
+}
+
+model TechnicalReview {
+  id                         String        @id @default(cuid())
+  changeRequestId            String        @unique
+  operatingSafety            ReviewAnswer?
+  interchangeability         ReviewAnswer?
+  affectsOthers              ReviewAnswer?
+  affectedItemsExplanation   String?
+  existingArticlesUsable     ReviewAnswer?
+  existingArticlesAction     String?
+  nextSteps                  String?
+  implementationNotes        String?
+  sparePartsCatalogueUpdated ReviewAnswer?
+  manufacturingDocsUpdated   ReviewAnswer?
+  completed                  Boolean       @default(false)
+  completedById              String?
+  completedAt                DateTime?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+  changeRequest              ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  completedBy                User?         @relation("TechnicalReviewCompletedBy", fields: [completedById], references: [id])
+}
+
+model AvorImpactReview {
+  id                           String        @id @default(cuid())
+  changeRequestId              String        @unique
+  stockNeedsAction             ReviewAnswer?
+  stockActionExplanation       String?
+  purchaseOrdersNeedUpdate     ReviewAnswer?
+  purchaseOrderExplanation     String?
+  productionOrdersNeedUpdate   ReviewAnswer?
+  productionOrderExplanation   String?
+  deliveredMachinesNeedParts   ReviewAnswer?
+  deliveredMachinesExplanation String?
+  validFromMachineNumber       String?
+  estimatedAdditionalCosts     Decimal?      @db.Decimal(12, 2)
+  currency                     String        @default("CHF")
+  remarks                      String?
+  completed                    Boolean       @default(false)
+  completedById                String?
+  completedAt                  DateTime?
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
+  changeRequest                ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  completedBy                  User?         @relation("AvorReviewCompletedBy", fields: [completedById], references: [id])
+}
+
+model PurchasingReview {
+  id                   String        @id @default(cuid())
+  changeRequestId      String        @unique
+  purchasingRequired   Boolean?
+  supplier             String?
+  notes                String?
+  orderRequired        Boolean?
+  orderCompleted       Boolean       @default(false)
+  expectedDeliveryDate DateTime?
+  completed            Boolean       @default(false)
+  completedById        String?
+  completedAt          DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  changeRequest        ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  completedBy          User?         @relation("PurchasingReviewCompletedBy", fields: [completedById], references: [id])
+}
+
+model Task {
+  id                 String        @id @default(cuid())
+  changeRequestId    String
+  title              String
+  description        String?
+  responsibleUserId  String?
+  department         Department
+  dueDate            DateTime?
+  priority           TaskPriority  @default(NORMAL)
+  status             TaskStatus    @default(OPEN)
+  requiredForClosure Boolean       @default(true)
+  createdById        String
+  completedById      String?
+  completedAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  changeRequest      ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  responsibleUser    User?         @relation("TaskResponsible", fields: [responsibleUserId], references: [id])
+  createdBy          User          @relation("TaskCreator", fields: [createdById], references: [id])
+  completedBy        User?         @relation("TaskCompleter", fields: [completedById], references: [id])
+
+  @@index([responsibleUserId, status])
+  @@index([dueDate, status])
+}
+
+model Attachment {
+  id              String        @id @default(cuid())
+  changeRequestId String
+  originalName    String
+  storageKey      String        @unique
+  mimeType        String
+  sizeBytes       Int
+  category        String?
+  uploadedById    String
+  uploadedAt      DateTime      @default(now())
+  deletedAt       DateTime?
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  uploadedBy      User          @relation(fields: [uploadedById], references: [id])
+}
+
+model Comment {
+  id              String        @id @default(cuid())
+  changeRequestId String
+  authorId        String
+  text            String
+  createdAt       DateTime      @default(now())
+  editedAt        DateTime?
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  author          User          @relation(fields: [authorId], references: [id])
+}
+
+model AuditEvent {
+  id              String         @id @default(cuid())
+  changeRequestId String?
+  userId          String?
+  action          String
+  entityType      String
+  entityId        String?
+  summary         String
+  details         Json?
+  timestamp       DateTime       @default(now())
+  changeRequest   ChangeRequest? @relation(fields: [changeRequestId], references: [id])
+  user            User?          @relation(fields: [userId], references: [id])
+
+  @@index([changeRequestId, timestamp])
+}
+
+model AppSetting {
+  key         String   @id
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+}

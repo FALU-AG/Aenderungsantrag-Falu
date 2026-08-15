@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Falu Change Request
 
-## Getting Started
+Interne Webanwendung der Falu AG für den vollständigen Lebenszyklus von Änderungsanträgen. Dieses Repository enthält Phase 1: technische Grundlage, Datenmodell, Prototyp-Identität, Berechtigungen, Audit-Architektur und Anwendungsshell.
 
-First, run the development server:
+## Voraussetzungen
+
+- Node.js LTS (mindestens Node.js 20)
+- npm
+- Docker Desktop mit Docker Compose für die lokale PostgreSQL-Datenbank
+
+## Installation
+
+```bash
+npm install
+copy .env.example .env
+docker compose up -d
+npm run db:generate
+npm run db:migrate -- --name init
+npm run db:seed
+npm run dev
+```
+
+Die Anwendung ist anschließend unter `http://localhost:3000` erreichbar. Die PostgreSQL-Datenbank wird lokal auf Port `5432` bereitgestellt.
+
+## Umgebungsvariablen
+
+| Variable | Bedeutung |
+|---|---|
+| `DATABASE_URL` | PostgreSQL-Verbindungszeichenfolge für Prisma |
+| `AUTH_COOKIE_SECURE` | Für lokale HTTP-Entwicklung `false`, in HTTPS-Umgebungen `true` |
+
+Keine produktiven Geheimnisse committen. `.env.example` enthält ausschließlich lokale Beispielwerte.
+
+## Datenbankbefehle
+
+```bash
+npm run db:generate
+npm run db:migrate -- --name beschreibung
+npm run db:seed
+npx prisma studio
+```
+
+Migrationen werden in `prisma/migrations` versioniert. Seed-Daten sind wiederholt ausführbar und umfassen Rollen, Beispielbenutzer, Maschinentypen, Änderungsgründe und Grundeinstellungen.
+
+## Entwicklung und Prüfung
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run typecheck
+npm run lint
+npm test
+npm run test:e2e
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Für den ersten Playwright-Lauf kann `npx playwright install chromium` erforderlich sein.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architektur
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Die Anwendung ist ein modularer Next.js-Monolith:
 
-## Learn More
+- `src/app`: Routen, Seiten und serverseitige Actions
+- `src/components`: wiederverwendbare Oberfläche und Anwendungsshell
+- `src/modules`: fachliche Module wie Authentifizierung, Berechtigungen, Workflow und Audit
+- `src/server`: Datenbank- und Infrastrukturadapter
+- `prisma`: Schema, Migrationen und Seed
+- `e2e`: Playwright-Browsertests
 
-To learn more about Next.js, take a look at the following resources:
+Der aktuelle `SampleIdentityProvider` verwendet ein HTTP-only Cookie und feste Beispielbenutzer. Die Abstraktion `IdentityProvider` erlaubt später den Austausch gegen Microsoft Entra ID. Berechtigungen werden über explizite Permission-Schlüssel serverseitig geprüft.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Geschäftsmutationen sollen `withAudit` verwenden. Dadurch werden Datenänderung und Audit-Eintrag in derselben Datenbanktransaktion gespeichert. Eingereichte und abgeschlossene Datensätze werden in späteren Phasen nur archiviert beziehungsweise gesperrt, niemals hart gelöscht.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Anhänge werden im Prototyp künftig unter `storage/` abgelegt; der Ordner ist von Git ausgeschlossen. Metadaten liegen in PostgreSQL.

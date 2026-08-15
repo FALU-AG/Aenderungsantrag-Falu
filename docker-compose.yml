@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: falu-change-request-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: falu_change_request
+      POSTGRES_USER: falu
+      POSTGRES_PASSWORD: falu_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - falu_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U falu -d falu_change_request"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  falu_postgres_data:
