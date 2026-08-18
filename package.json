@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:check": "node scripts/dev-server.mjs check",
+    "dev:ensure": "node scripts/dev-server.mjs ensure",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -28,6 +30,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
+    "openai": "^7.5.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.85.0",

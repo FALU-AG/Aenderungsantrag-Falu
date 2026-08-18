@@ -1,4 +1,22 @@
-export const MACHINE_TYPES = ["CB1", "CS-2500", "CT", "SV-2X", "BL-16", "ABS"].map((code) => ({ code, name: code, active: true }));
+export const MACHINE_TYPES = [
+  "CB1",
+  "CT",
+  "CS-2500",
+  "PRX",
+  "SV-2X",
+  "ABS",
+  "BL-8",
+  "BL-12",
+  "BL-16",
+  "BLS-12",
+  "BV-2A",
+  "BV-2M",
+  "RB-30A",
+  "SQB-2A",
+  "SQB-AT",
+  "SV2-S",
+  "WV",
+].map((code) => ({ code, name: code, active: true }));
 
 export const CHANGE_REASONS = [
   "Änderung eines Teils oder einer Baugruppe an einer bestehenden Maschine",
@@ -12,4 +30,10 @@ export const CHANGE_REASONS = [
   "Sicherheitsänderung",
   "Änderung aufgrund Service-Erfahrung",
   "Sonstiges",
-].map((label, index) => ({ key: `REASON_${String(index + 1).padStart(2, "0")}`, label, isOther: label === "Sonstiges", active: true, sortOrder: index + 1 }));
+].map((label, index) => ({
+  key: `REASON_${String(index + 1).padStart(2, "0")}`,
+  label,
+  isOther: label === "Sonstiges",
+  active: index !== 0,
+  sortOrder: index + 1,
+}));

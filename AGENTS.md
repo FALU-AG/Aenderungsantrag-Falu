@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Local development availability
+
+After every implementation task, run validation and then run `npm run dev:ensure` so the local application is available at `http://localhost:3000`. Verify that the URL responds and report it to the user.

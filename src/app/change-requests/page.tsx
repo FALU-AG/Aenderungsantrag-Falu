@@ -133,7 +133,7 @@ export default async function RequestsPage({
                     {r.title || "Unbenannter Entwurf"}
                   </td>
                   <td className="px-4 py-3">{r.machineType?.code ?? "–"}</td>
-                  <td className="px-4 py-3">{r.applicant.name}</td>
+                  <td className="px-4 py-3">{r.applicantName || r.applicant.name}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={r.status as ChangeRequestStatusKey} />
                   </td>

@@ -133,6 +133,7 @@ model ChangeRequest {
   number             String                @unique
   title              String                @default("")
   applicantId        String
+  applicantName      String                @default("")
   machineTypeId      String?
   articleNumber      String?
   articleDescription String?

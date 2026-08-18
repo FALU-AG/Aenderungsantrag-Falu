@@ -18,6 +18,8 @@ npm run db:generate
 npm run db:migrate -- --name init
 npm run db:seed
 npm run dev
+npm run dev:check
+npm run dev:ensure
 ```
 
 Die Anwendung ist anschließend unter `http://localhost:3000` erreichbar. Die PostgreSQL-Datenbank wird lokal auf Port `5432` bereitgestellt.
@@ -54,6 +56,22 @@ npm run build
 ```
 
 Für den ersten Playwright-Lauf kann `npx playwright install chromium` erforderlich sein.
+
+`npm run dev:ensure` prüft `http://localhost:3000`, startet den Next.js-Entwicklungsserver bei Bedarf im Hintergrund und verhindert einen Doppelstart. Ist Port 3000 durch einen anderen Prozess belegt, wird dies als Fehler gemeldet.
+
+## OpenAI-Unterstützung
+
+Für echte AI-Schreibhilfe und Spracheingabe werden die Provider ausschließlich serverseitig konfiguriert:
+
+```env
+AI_PROVIDER="openai"
+SPEECH_PROVIDER="openai"
+OPENAI_API_KEY="..."
+OPENAI_TEXT_MODEL="gpt-5.6"
+OPENAI_TRANSCRIPTION_MODEL="gpt-4o-mini-transcribe"
+```
+
+Ohne Provider oder API-Schlüssel bleibt die Anwendung normal nutzbar und zeigt einen nicht störenden Hinweis. Für lokale Tests stehen weiterhin `AI_PROVIDER="mock"` und `SPEECH_PROVIDER="mock"` zur Verfügung. API-Schlüssel dürfen nicht committed werden.
 
 ## Architektur
 
