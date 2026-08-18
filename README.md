@@ -24,9 +24,9 @@ Die Anwendung ist anschließend unter `http://localhost:3000` erreichbar. Die Po
 
 ## Umgebungsvariablen
 
-| Variable | Bedeutung |
-|---|---|
-| `DATABASE_URL` | PostgreSQL-Verbindungszeichenfolge für Prisma |
+| Variable             | Bedeutung                                                       |
+| -------------------- | --------------------------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL-Verbindungszeichenfolge für Prisma                   |
 | `AUTH_COOKIE_SECURE` | Für lokale HTTP-Entwicklung `false`, in HTTPS-Umgebungen `true` |
 
 Keine produktiven Geheimnisse committen. `.env.example` enthält ausschließlich lokale Beispielwerte.
@@ -88,3 +88,7 @@ Im Tab `Freigaben` entscheiden AVOR und Technik unabhängig voneinander. Entsche
 ## Phase-4-Technische-Prüfung
 
 Nach der Freigabe dokumentiert die Technik Sicherheit, Austauschbarkeit, Auswirkungen, bestehende Artikel, nächste Schritte und Dokumentationsstände. Teilstände können gespeichert und später abgeschlossen werden. Abgeschlossene Prüfungen sind gesperrt und können von Technik oder Administration nur mit protokollierter Begründung erneut geöffnet werden.
+
+## Phase-5-AVOR-Auswirkungsprüfung
+
+AVOR und Administration erfassen parallel zur technischen Prüfung die Auswirkungen auf Lagerbestand, Bestellungen, Produktionsaufträge und ausgelieferte Maschinen. Teilstände, Abschluss und begründetes Wiederöffnen werden vollständig auditiert. Sobald eine der beiden Umsetzungsprüfungen beginnt, wechselt der Antrag in `AVOR / Produktionsvorbereitung`; nach Abschluss beider Prüfungen erfolgt der transaktional abgesicherte Übergang zu `Einkauf / Beschaffung`.
