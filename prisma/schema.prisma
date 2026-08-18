@@ -197,7 +197,9 @@ model TechnicalReview {
   id                         String        @id @default(cuid())
   changeRequestId            String        @unique
   operatingSafety            ReviewAnswer?
+  operatingSafetyComment     String?
   interchangeability         ReviewAnswer?
+  interchangeabilityComment  String?
   affectsOthers              ReviewAnswer?
   affectedItemsExplanation   String?
   existingArticlesUsable     ReviewAnswer?
@@ -205,7 +207,9 @@ model TechnicalReview {
   nextSteps                  String?
   implementationNotes        String?
   sparePartsCatalogueUpdated ReviewAnswer?
+  sparePartsCatalogueComment String?
   manufacturingDocsUpdated   ReviewAnswer?
+  manufacturingDocsComment   String?
   completed                  Boolean       @default(false)
   completedById              String?
   completedAt                DateTime?

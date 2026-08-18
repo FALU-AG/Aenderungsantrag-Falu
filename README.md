@@ -84,3 +84,7 @@ Antragsnummern werden beim ersten Speichern serverseitig über einen jährlichen
 ## Phase-3-Freigabeworkflow
 
 Im Tab `Freigaben` entscheiden AVOR und Technik unabhängig voneinander. Entscheidungen sind unveränderlich, rollenbasiert geschützt und werden gemeinsam mit automatischen Statusübergängen und Audit-Ereignissen transaktional gespeichert. Eine Ablehnung führt zu `Änderung erforderlich`; nach der Überarbeitung erzeugt die erneute Einreichung eine neue Freigaberunde, während frühere Runden vollständig lesbar bleiben.
+
+## Phase-4-Technische-Prüfung
+
+Nach der Freigabe dokumentiert die Technik Sicherheit, Austauschbarkeit, Auswirkungen, bestehende Artikel, nächste Schritte und Dokumentationsstände. Teilstände können gespeichert und später abgeschlossen werden. Abgeschlossene Prüfungen sind gesperrt und können von Technik oder Administration nur mit protokollierter Begründung erneut geöffnet werden.

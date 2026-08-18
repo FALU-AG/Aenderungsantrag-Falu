@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Allows validation builds to avoid transient OneDrive locks on the default folder.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
 };
 
 export default nextConfig;

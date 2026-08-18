@@ -18,6 +18,9 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
+  "overrides": {
+    "deepmerge-ts": "8.0.1"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.8.0",
     "@prisma/client": "^6.19.3",

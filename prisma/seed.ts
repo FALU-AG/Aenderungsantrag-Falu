@@ -48,6 +48,10 @@ async function main() {
     { number: "CR-2026-004", title: "Verbesserung Materialführung SV-2X", applicantId: "sample-max-muster", machineTypeId: machineId("SV-2X"), description: "Die Materialführung wird für einen stabileren Produktionsprozess verbessert.", status: "APPROVED_FOR_IMPLEMENTATION" as const, reasonIndexes: [1] },
     { number: "CR-2026-005", title: "Anpassung Zugang Servicebereich BL-16", applicantId: "sample-max-muster", machineTypeId: machineId("BL-16"), description: "Der Zugang zum Servicebereich soll angepasst werden.", status: "CHANGES_REQUESTED" as const, reasonIndexes: [9] },
     { number: "CR-2026-006", title: "Überarbeitung Sensorhalter ABS", applicantId: "sample-max-muster", machineTypeId: machineId("ABS"), description: "Der Sensorhalter wurde nach einer Rückweisung überarbeitet.", status: "UNDER_REVIEW" as const, reasonIndexes: [3], approvalCycle: 2 },
+    { number: "CR-2026-007", title: "Optimierung Einlaufblech CB1", applicantId: "sample-max-muster", machineTypeId: machineId("CB1"), description: "Technische Ausarbeitung des angepassten Einlaufblechs.", status: "APPROVED_FOR_IMPLEMENTATION" as const, reasonIndexes: [1] },
+    { number: "CR-2026-008", title: "Neue Lagerung Förderwelle CT", applicantId: "sample-anna-avor", machineTypeId: machineId("CT"), description: "Die Lagerung der Förderwelle wird technisch überarbeitet.", status: "APPROVED_FOR_IMPLEMENTATION" as const, reasonIndexes: [1, 7] },
+    { number: "CR-2026-009", title: "Anpassung Kupplungsaufnahme SV-2X", applicantId: "sample-max-muster", machineTypeId: machineId("SV-2X"), description: "Die neue Kupplungsaufnahme ist nicht rückwärts austauschbar.", status: "APPROVED_FOR_IMPLEMENTATION" as const, reasonIndexes: [0] },
+    { number: "CR-2026-010", title: "Sicherheitsbügel Baugruppe BL-16", applicantId: "sample-thomas-technik", machineTypeId: machineId("BL-16"), description: "Der Sicherheitsbügel beeinflusst weitere Baugruppen.", status: "APPROVED_FOR_IMPLEMENTATION" as const, reasonIndexes: [8] },
   ];
   for (const sample of samples) {
     const cycle = (sample as { approvalCycle?: number }).approvalCycle ?? 1;
@@ -67,7 +71,13 @@ async function main() {
   const cycleRequest = seeded.get("CR-2026-006")!;
   for (const type of ["AVOR", "TECHNICAL"] as const) await prisma.approval.upsert({ where: { changeRequestId_type_cycle: { changeRequestId: cycleRequest.id, type, cycle: 1 } }, update: {}, create: { changeRequestId: cycleRequest.id, type, cycle: 1 } });
   await decision("CR-2026-006", "AVOR", "APPROVED", "sample-anna-avor", undefined, 1); await decision("CR-2026-006", "TECHNICAL", "REJECTED", "sample-thomas-technik", "Sensorposition korrigieren.", 1);
-  await prisma.changeRequestCounter.upsert({ where: { year: 2026 }, update: { nextNumber: { set: 7 } }, create: { year: 2026, nextNumber: 7 } });
+  for (const number of ["CR-2026-007", "CR-2026-008", "CR-2026-009", "CR-2026-010"]) { await decision(number, "AVOR", "APPROVED", "sample-anna-avor"); await decision(number, "TECHNICAL", "APPROVED", "sample-thomas-technik"); }
+  const reviewBase = { operatingSafety: "YES" as const, interchangeability: "YES" as const, affectsOthers: "NO" as const, existingArticlesUsable: "YES" as const, nextSteps: "Zeichnungen und Stücklisten gemäss Freigabe aktualisieren.", implementationNotes: "Umsetzung mit der nächsten regulären Konstruktionsrevision.", sparePartsCatalogueUpdated: "NOT_RELEVANT" as const, manufacturingDocsUpdated: "YES" as const };
+  await prisma.technicalReview.upsert({ where: { changeRequestId: seeded.get("CR-2026-007")!.id }, update: {}, create: { changeRequestId: seeded.get("CR-2026-007")!.id, operatingSafety: "YES", nextSteps: "Versuchsaufbau vorbereiten." } });
+  await prisma.technicalReview.upsert({ where: { changeRequestId: seeded.get("CR-2026-008")!.id }, update: {}, create: { changeRequestId: seeded.get("CR-2026-008")!.id, ...reviewBase, completed: true, completedById: "sample-thomas-technik", completedAt: new Date() } });
+  await prisma.technicalReview.upsert({ where: { changeRequestId: seeded.get("CR-2026-009")!.id }, update: {}, create: { changeRequestId: seeded.get("CR-2026-009")!.id, ...reviewBase, interchangeability: "NO", interchangeabilityComment: "Bestehende Kupplungen benötigen einen Adapter und sind nicht direkt austauschbar.", completed: true, completedById: "sample-thomas-technik", completedAt: new Date() } });
+  await prisma.technicalReview.upsert({ where: { changeRequestId: seeded.get("CR-2026-010")!.id }, update: {}, create: { changeRequestId: seeded.get("CR-2026-010")!.id, ...reviewBase, affectsOthers: "YES", affectedItemsExplanation: "Schutzhaube und Haltewinkel der Baugruppe müssen ebenfalls angepasst werden.", completed: true, completedById: "sample-thomas-technik", completedAt: new Date() } });
+  await prisma.changeRequestCounter.upsert({ where: { year: 2026 }, update: { nextNumber: { set: 11 } }, create: { year: 2026, nextNumber: 11 } });
 }
 
 main().finally(async () => prisma.$disconnect());
