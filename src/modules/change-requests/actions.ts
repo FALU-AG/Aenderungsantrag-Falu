@@ -25,9 +25,9 @@ export async function saveChangeRequest(_state: FormState, formData: FormData): 
 
   await db.$transaction(async (tx) => {
     if (id) {
-      const existing = await tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { applicantId: true, status: true, version: true } });
+      const existing = await tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { applicantId: true, status: true, version: true, approvalCycle: true } });
       requireDraftEdit(user, existing);
-      const updated = await tx.changeRequest.updateMany({ where: { id, version: parsed.data.version, status: "DRAFT" }, data: {
+      const updated = await tx.changeRequest.updateMany({ where: { id, version: parsed.data.version, status: existing.status }, data: {
         title: parsed.data.title, machineTypeId: parsed.data.machineTypeId || null, articleNumber: parsed.data.articleNumber || null,
         articleDescription: parsed.data.articleDescription || null, description: parsed.data.description, otherReasonText: parsed.data.otherReasonText || null, version: { increment: 1 },
       } });
@@ -35,6 +35,7 @@ export async function saveChangeRequest(_state: FormState, formData: FormData): 
       await tx.changeRequestReason.deleteMany({ where: { changeRequestId: id } });
       if (parsed.data.reasonIds.length) await tx.changeRequestReason.createMany({ data: parsed.data.reasonIds.map((changeReasonId) => ({ changeRequestId: id, changeReasonId })) });
       await tx.auditEvent.create({ data: { changeRequestId: id, userId: user.id, action: "CHANGE_REQUEST_UPDATED", entityType: "ChangeRequest", entityId: id, summary: "Entwurf aktualisiert", details: { version: existing.version + 1 } } });
+      if (existing.status === "CHANGES_REQUESTED" && await tx.auditEvent.count({ where: { changeRequestId: id, action: "REVISION_STARTED", details: { path: ["approvalCycle"], equals: existing.approvalCycle } } }) === 0) await tx.auditEvent.create({ data: { changeRequestId: id, userId: user.id, action: "REVISION_STARTED", entityType: "ChangeRequest", entityId: id, summary: `${user.name} hat die Überarbeitung des Änderungsantrags begonnen.`, details: { approvalCycle: existing.approvalCycle } } });
     } else {
       const number = await generateChangeRequestNumber(tx);
       const created = await tx.changeRequest.create({ data: {
@@ -46,10 +47,14 @@ export async function saveChangeRequest(_state: FormState, formData: FormData): 
       await tx.auditEvent.create({ data: { changeRequestId: created.id, userId: user.id, action: "CHANGE_REQUEST_CREATED", entityType: "ChangeRequest", entityId: created.id, summary: `Änderungsantrag ${number} als Entwurf erstellt` } });
     }
     if (intent === "submit") {
-      const submission = submissionData();
-      await tx.changeRequest.update({ where: { id: requestId }, data: { ...submission.request, version: { increment: 1 } } });
+      const current = await tx.changeRequest.findUniqueOrThrow({ where: { id: requestId }, select: { status: true, approvalCycle: true } });
+      const cycle = current.status === "CHANGES_REQUESTED" ? current.approvalCycle + 1 : current.approvalCycle;
+      const submission = submissionData(new Date(), cycle);
+      await tx.changeRequest.update({ where: { id: requestId }, data: { ...submission.request, approvalCycle: cycle, version: { increment: 1 } } });
       await tx.approval.createMany({ data: submission.approvals.map((approval) => ({ changeRequestId: requestId, ...approval })) });
-      await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, ...submission.audit, entityType: "ChangeRequest", entityId: requestId, details: { status: "UNDER_REVIEW", approvalCycle: 1 } } });
+      const resubmitted = cycle > 1;
+      await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: resubmitted ? "REVISED_REQUEST_SUBMITTED" : submission.audit.action, entityType: "ChangeRequest", entityId: requestId, summary: resubmitted ? `${user.name} hat den Änderungsantrag überarbeitet und erneut eingereicht.` : submission.audit.summary, details: { status: "UNDER_REVIEW", approvalCycle: cycle } } });
+      if (resubmitted) await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: "APPROVAL_CYCLE_CREATED", entityType: "Approval", entityId: requestId, summary: `Freigaberunde ${cycle} mit offenen AVOR- und Technikfreigaben erstellt.`, details: { approvalCycle: cycle } } });
     }
   });
 
@@ -87,12 +92,15 @@ export async function submitExistingRequest(requestId: string) {
   requireDraftEdit(user, request);
   const other = await db.changeReason.findFirst({ where: { isOther: true, active: true }, select: { id: true } });
   submissionSchema(other?.id).parse({ title: request.title, machineTypeId: request.machineTypeId ?? "", articleNumber: request.articleNumber ?? "", articleDescription: request.articleDescription ?? "", reasonIds: request.reasons.map((reason) => reason.changeReasonId), otherReasonText: request.otherReasonText ?? "", description: request.description, version: request.version });
-  const submission = submissionData();
+  const cycle = request.status === "CHANGES_REQUESTED" ? request.approvalCycle + 1 : request.approvalCycle;
+  const submission = submissionData(new Date(), cycle);
   await db.$transaction(async (tx) => {
-    const updated = await tx.changeRequest.updateMany({ where: { id: requestId, version: request.version, status: "DRAFT" }, data: { ...submission.request, version: { increment: 1 } } });
+    const updated = await tx.changeRequest.updateMany({ where: { id: requestId, version: request.version, status: request.status }, data: { ...submission.request, approvalCycle: cycle, version: { increment: 1 } } });
     if (updated.count !== 1) throw new Error("Der Antrag wurde zwischenzeitlich geändert. Laden Sie die Seite neu.");
     await tx.approval.createMany({ data: submission.approvals.map((approval) => ({ changeRequestId: requestId, ...approval })) });
-    await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, ...submission.audit, entityType: "ChangeRequest", entityId: requestId, details: { status: "UNDER_REVIEW", approvalCycle: 1 } } });
+    const resubmitted = cycle > 1;
+    await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: resubmitted ? "REVISED_REQUEST_SUBMITTED" : submission.audit.action, entityType: "ChangeRequest", entityId: requestId, summary: resubmitted ? `${user.name} hat den Änderungsantrag überarbeitet und erneut eingereicht.` : submission.audit.summary, details: { status: "UNDER_REVIEW", approvalCycle: cycle } } });
+    if (resubmitted) await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: "APPROVAL_CYCLE_CREATED", entityType: "Approval", entityId: requestId, summary: `Freigaberunde ${cycle} mit offenen AVOR- und Technikfreigaben erstellt.`, details: { approvalCycle: cycle } } });
   });
   revalidatePath("/"); revalidatePath("/change-requests"); redirect(`/change-requests/${requestId}`);
 }
