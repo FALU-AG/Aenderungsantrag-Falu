@@ -234,6 +234,69 @@ async function main() {
       status: "PURCHASING_PROCUREMENT" as const,
       reasonIndexes: [2, 8],
     },
+    {
+      number: "CR-2026-012",
+      title: "Beschaffung Führungsrolle CB1",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("CB1"),
+      description: "Einkaufsprüfung ist noch nicht begonnen.",
+      status: "PURCHASING_PROCUREMENT" as const,
+      reasonIndexes: [1],
+    },
+    {
+      number: "CR-2026-013",
+      title: "Neuer Sensor CT",
+      applicantId: "sample-anna-avor",
+      machineTypeId: machineId("CT"),
+      description: "Lieferant wird durch den Einkauf abgeklärt.",
+      status: "PURCHASING_PROCUREMENT" as const,
+      reasonIndexes: [3],
+    },
+    {
+      number: "CR-2026-014",
+      title: "Softwareparameter CS-2500",
+      applicantId: "sample-thomas-technik",
+      machineTypeId: machineId("CS-2500"),
+      description: "Keine externe Beschaffung erforderlich.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [4],
+    },
+    {
+      number: "CR-2026-015",
+      title: "Kupplungseinsatz SV-2X",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("SV-2X"),
+      description: "Lieferant ausgewählt, Bestellung noch offen.",
+      status: "PURCHASING_PROCUREMENT" as const,
+      reasonIndexes: [0],
+    },
+    {
+      number: "CR-2026-016",
+      title: "Schutzprofil BL-16",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("BL-16"),
+      description: "Bestellung mit zukünftigem Liefertermin ausgelöst.",
+      status: "PURCHASING_PROCUREMENT" as const,
+      reasonIndexes: [8],
+    },
+    {
+      number: "CR-2026-017",
+      title: "Nachrüstsatz ABS komplett",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("ABS"),
+      description: "Einkaufsprüfung abgeschlossen.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [2],
+    },
+    {
+      number: "CR-2026-018",
+      title: "Lagerbock CT verspätet",
+      applicantId: "sample-anna-avor",
+      machineTypeId: machineId("CT"),
+      description: "Der erwartete Liefertermin ist überschritten.",
+      status: "PURCHASING_PROCUREMENT" as const,
+      reasonIndexes: [7],
+    },
   ];
   for (const sample of samples) {
     const cycle = (sample as { approvalCycle?: number }).approvalCycle ?? 1;
@@ -241,6 +304,7 @@ async function main() {
       where: { number: sample.number },
       update: {
         title: sample.title,
+        status: sample.status,
         applicantName: applicantName(sample.applicantId),
         articleNumber: `ART-${sample.number.slice(-3)}`,
         articleDescription: sample.title,
@@ -472,6 +536,91 @@ async function main() {
       remarks: "Lagerbestand wird noch geprüft.",
     },
   });
+  const purchasingExamples = [
+    {
+      number: "CR-2026-013",
+      data: {
+        purchasingRequired: true,
+        supplier: "Lieferant wird evaluiert",
+        supplierNotes: "Angebote bei zwei Lieferanten angefragt.",
+        orderRequired: null,
+        notes: "Rückmeldung bis Ende Woche erwartet.",
+      },
+    },
+    {
+      number: "CR-2026-014",
+      data: {
+        purchasingRequired: false,
+        orderRequired: false,
+        completed: true,
+        completedById: "sample-petra-einkauf",
+        completedAt: new Date(),
+      },
+    },
+    {
+      number: "CR-2026-015",
+      data: {
+        purchasingRequired: true,
+        supplier: "Muster Komponenten AG",
+        orderRequired: true,
+        orderCompleted: false,
+        notes: "Bestellfreigabe ausstehend.",
+      },
+    },
+    {
+      number: "CR-2026-016",
+      data: {
+        purchasingRequired: true,
+        supplier: "Profiltechnik Schweiz AG",
+        orderRequired: true,
+        orderCompleted: true,
+        orderNumber: "PO-2026-0816",
+        orderDate: new Date("2026-08-16"),
+        orderedById: "sample-petra-einkauf",
+        expectedDeliveryDate: new Date("2026-09-15"),
+      },
+    },
+    {
+      number: "CR-2026-017",
+      data: {
+        purchasingRequired: true,
+        supplier: "Sensorik Muster AG",
+        orderRequired: true,
+        orderCompleted: true,
+        orderNumber: "PO-2026-0802",
+        orderDate: new Date("2026-08-02"),
+        orderedById: "sample-petra-einkauf",
+        expectedDeliveryDate: new Date("2026-08-25"),
+        completed: true,
+        completedById: "sample-petra-einkauf",
+        completedAt: new Date(),
+      },
+    },
+    {
+      number: "CR-2026-018",
+      data: {
+        purchasingRequired: true,
+        supplier: "Gussteile Beispiel AG",
+        orderRequired: true,
+        orderCompleted: false,
+        orderNumber: "PO-2026-0711",
+        expectedDeliveryDate: new Date("2026-08-01"),
+        notes: "Lieferant wurde wegen Terminverzug kontaktiert.",
+      },
+    },
+  ];
+  await prisma.purchasingReview.deleteMany({
+    where: { changeRequestId: seeded.get("CR-2026-012")!.id },
+  });
+  for (const example of purchasingExamples)
+    await prisma.purchasingReview.upsert({
+      where: { changeRequestId: seeded.get(example.number)!.id },
+      update: example.data,
+      create: {
+        changeRequestId: seeded.get(example.number)!.id,
+        ...example.data,
+      },
+    });
   await prisma.avorImpactReview.upsert({
     where: { changeRequestId: seeded.get("CR-2026-008")!.id },
     update: {},
@@ -532,8 +681,8 @@ async function main() {
   });
   await prisma.changeRequestCounter.upsert({
     where: { year: 2026 },
-    update: { nextNumber: { set: 12 } },
-    create: { year: 2026, nextNumber: 12 },
+    update: { nextNumber: { set: 19 } },
+    create: { year: 2026, nextNumber: 19 },
   });
 }
 

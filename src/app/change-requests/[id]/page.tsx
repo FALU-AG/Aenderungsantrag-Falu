@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { ApprovalCard } from "@/components/approval-card";
 import { TechnicalReviewForm } from "@/components/technical-review-form";
 import { AvorReviewForm } from "@/components/avor-review-form";
+import { PurchasingReviewForm } from "@/components/purchasing-review-form";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { canEditDraft } from "@/modules/change-requests/authorization";
 import {
@@ -37,6 +38,12 @@ import {
   IMPACT_LABELS,
   type ImpactAnswerKey,
 } from "@/modules/avor-review/domain";
+import {
+  canEditPurchasingReview,
+  isDeliveryOverdue,
+  purchasingReviewAvailable,
+  purchasingReviewState,
+} from "@/modules/purchasing-review/domain";
 
 const tabs = [
   "Übersicht",
@@ -85,6 +92,7 @@ export default async function RequestDetailPage({
       },
       technicalReview: { include: { completedBy: true } },
       avorImpactReview: { include: { completedBy: true } },
+      purchasingReview: { include: { completedBy: true, orderedBy: true } },
       attachments: {
         where: { deletedAt: null },
         orderBy: { uploadedAt: "desc" },
@@ -171,6 +179,7 @@ export default async function RequestDetailPage({
           <div className="mt-5 space-y-5">
             <TechnicalSummary review={request.technicalReview} />
             <AvorSummary review={request.avorImpactReview} />
+            <PurchasingSummary review={request.purchasingReview} />
           </div>
         </>
       ) : tab === "Freigaben" ? (
@@ -216,6 +225,30 @@ export default async function RequestDetailPage({
           }
           editable={canEditAvorReview(user, request.status)}
           available={avorReviewAvailable(request.status)}
+        />
+      ) : tab === "Einkauf" ? (
+        <PurchasingReviewForm
+          requestId={id}
+          review={
+            request.purchasingReview
+              ? {
+                  ...request.purchasingReview,
+                  orderDate:
+                    request.purchasingReview.orderDate
+                      ?.toISOString()
+                      .slice(0, 10) ?? null,
+                  expectedDeliveryDate:
+                    request.purchasingReview.expectedDeliveryDate
+                      ?.toISOString()
+                      .slice(0, 10) ?? null,
+                  completedAt: request.purchasingReview.completedAt
+                    ? formatDate(request.purchasingReview.completedAt)
+                    : null,
+                }
+              : null
+          }
+          editable={canEditPurchasingReview(user, request.status)}
+          available={purchasingReviewAvailable(request.status)}
         />
       ) : tab === "Anhänge" ? (
         <Attachments
@@ -458,6 +491,95 @@ function AvorSummary({
               {review.remarks}
             </p>
           )}
+        </>
+      )}
+    </Card>
+  );
+}
+function PurchasingSummary({
+  review,
+}: {
+  review: {
+    purchasingRequired: boolean | null;
+    supplier: string | null;
+    orderRequired: boolean | null;
+    orderCompleted: boolean;
+    orderNumber: string | null;
+    expectedDeliveryDate: Date | null;
+    completed: boolean;
+    completedAt: Date | null;
+    completedBy: { name: string } | null;
+  } | null;
+}) {
+  const overdue = isDeliveryOverdue(
+    review?.expectedDeliveryDate,
+    review?.orderCompleted ?? false,
+  );
+  return (
+    <Card className="p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">Einkauf / Beschaffung</h2>
+        {overdue && (
+          <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+            Liefertermin überfällig
+          </span>
+        )}
+      </div>
+      {!review ? (
+        <p className="mt-3 text-sm text-slate-500">
+          Einkaufsprüfung noch nicht begonnen.
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 text-sm font-medium">
+            {purchasingReviewState(review) === "COMPLETED"
+              ? "Abgeschlossen"
+              : "Einkaufsprüfung in Bearbeitung."}
+          </p>
+          {review.completed && (
+            <p className="mt-1 text-xs text-slate-500">
+              Abgeschlossen von {review.completedBy?.name ?? "–"}
+              {review.completedAt ? ` · ${formatDate(review.completedAt)}` : ""}
+            </p>
+          )}
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Item
+              l="Beschaffung erforderlich"
+              v={
+                review.purchasingRequired === null
+                  ? "–"
+                  : review.purchasingRequired
+                    ? "Ja"
+                    : "Nein"
+              }
+            />
+            <Item l="Lieferant" v={review.supplier} />
+            <Item
+              l="Bestellung erforderlich"
+              v={
+                review.orderRequired === null
+                  ? "–"
+                  : review.orderRequired
+                    ? "Ja"
+                    : "Nein"
+              }
+            />
+            <Item
+              l="Bestellung ausgelöst"
+              v={review.orderCompleted ? "Ja" : "Nein"}
+            />
+            <Item l="Bestellnummer" v={review.orderNumber} />
+            <Item
+              l="Erwartete Lieferung"
+              v={
+                review.expectedDeliveryDate
+                  ? new Intl.DateTimeFormat("de-CH", {
+                      timeZone: "Europe/Zurich",
+                    }).format(review.expectedDeliveryDate)
+                  : "–"
+              }
+            />
+          </dl>
         </>
       )}
     </Card>

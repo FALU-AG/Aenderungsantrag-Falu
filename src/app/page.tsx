@@ -1,11 +1,11 @@
 import Link from "next/link";
 import {
-  AlertTriangle,
   ClipboardCheck,
   Clock3,
   Cog,
   RefreshCcw,
   Wrench,
+  ShoppingCart,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PageHeading } from "@/components/page-heading";
@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/server/db/client";
 import type { ChangeRequestStatusKey } from "@/modules/workflow/status";
 export default async function DashboardPage() {
-  const [open, reviewing, implementation, changesRequired, recent] =
+  const [open, reviewing, implementation, changesRequired, purchasing, recent] =
     await Promise.all([
       db.changeRequest.count({ where: { status: { not: "CLOSED" } } }),
       db.changeRequest.findMany({
@@ -26,14 +26,15 @@ export default async function DashboardPage() {
           },
         },
       }),
-    db.changeRequest.count({
-      where: {
-        status: {
-          in: ["APPROVED_FOR_IMPLEMENTATION", "AVOR_PRODUCTION_PREPARATION"],
+      db.changeRequest.count({
+        where: {
+          status: {
+            in: ["APPROVED_FOR_IMPLEMENTATION", "AVOR_PRODUCTION_PREPARATION"],
+          },
         },
-      },
-    }),
+      }),
       db.changeRequest.count({ where: { status: "CHANGES_REQUESTED" } }),
+      db.changeRequest.count({ where: { status: "PURCHASING_PROCUREMENT" } }),
       db.changeRequest.findMany({
         take: 6,
         orderBy: { updatedAt: "desc" },
@@ -58,7 +59,7 @@ export default async function DashboardPage() {
       icon: RefreshCcw,
     },
     { label: "In Umsetzung", value: implementation, icon: Cog },
-    { label: "Überfällige Aufgaben", value: 0, icon: AlertTriangle },
+    { label: "Einkauf offen", value: purchasing, icon: ShoppingCart },
   ];
   return (
     <>

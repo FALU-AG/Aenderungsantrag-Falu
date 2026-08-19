@@ -62,27 +62,28 @@ enum TaskStatus {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  name              String
-  email             String             @unique
-  department        Department?
-  active            Boolean            @default(true)
-  externalId        String?            @unique
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  roles             UserRole[]
-  requests          ChangeRequest[]    @relation("Applicant")
-  approvals         Approval[]         @relation("ApprovalDecisionUser")
-  technicalReviews  TechnicalReview[]  @relation("TechnicalReviewCompletedBy")
-  avorReviews       AvorImpactReview[] @relation("AvorReviewCompletedBy")
-  purchasingReviews PurchasingReview[] @relation("PurchasingReviewCompletedBy")
-  assignedTasks     Task[]             @relation("TaskResponsible")
-  createdTasks      Task[]             @relation("TaskCreator")
-  completedTasks    Task[]             @relation("TaskCompleter")
-  attachments       Attachment[]
-  comments          Comment[]
-  auditEvents       AuditEvent[]
-  closedRequests    ChangeRequest[]    @relation("ClosedBy")
+  id                   String             @id @default(cuid())
+  name                 String
+  email                String             @unique
+  department           Department?
+  active               Boolean            @default(true)
+  externalId           String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  roles                UserRole[]
+  requests             ChangeRequest[]    @relation("Applicant")
+  approvals            Approval[]         @relation("ApprovalDecisionUser")
+  technicalReviews     TechnicalReview[]  @relation("TechnicalReviewCompletedBy")
+  avorReviews          AvorImpactReview[] @relation("AvorReviewCompletedBy")
+  purchasingReviews    PurchasingReview[] @relation("PurchasingReviewCompletedBy")
+  placedPurchaseOrders PurchasingReview[] @relation("PurchasingReviewOrderedBy")
+  assignedTasks        Task[]             @relation("TaskResponsible")
+  createdTasks         Task[]             @relation("TaskCreator")
+  completedTasks       Task[]             @relation("TaskCompleter")
+  attachments          Attachment[]
+  comments             Comment[]
+  auditEvents          AuditEvent[]
+  closedRequests       ChangeRequest[]    @relation("ClosedBy")
 }
 
 model Role {
@@ -249,9 +250,13 @@ model PurchasingReview {
   changeRequestId      String        @unique
   purchasingRequired   Boolean?
   supplier             String?
+  supplierNotes        String?
   notes                String?
   orderRequired        Boolean?
   orderCompleted       Boolean       @default(false)
+  orderNumber          String?
+  orderDate            DateTime?
+  orderedById          String?
   expectedDeliveryDate DateTime?
   completed            Boolean       @default(false)
   completedById        String?
@@ -260,6 +265,7 @@ model PurchasingReview {
   updatedAt            DateTime      @updatedAt
   changeRequest        ChangeRequest @relation(fields: [changeRequestId], references: [id])
   completedBy          User?         @relation("PurchasingReviewCompletedBy", fields: [completedById], references: [id])
+  orderedBy            User?         @relation("PurchasingReviewOrderedBy", fields: [orderedById], references: [id])
 }
 
 model Task {
