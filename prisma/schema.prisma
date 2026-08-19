@@ -291,6 +291,7 @@ model Task {
 
   @@index([responsibleUserId, status])
   @@index([dueDate, status])
+  @@index([changeRequestId, status])
 }
 
 model Attachment {

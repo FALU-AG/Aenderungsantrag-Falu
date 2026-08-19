@@ -10,6 +10,7 @@ import { ApprovalCard } from "@/components/approval-card";
 import { TechnicalReviewForm } from "@/components/technical-review-form";
 import { AvorReviewForm } from "@/components/avor-review-form";
 import { PurchasingReviewForm } from "@/components/purchasing-review-form";
+import { TaskManagement } from "@/components/task-management";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { canEditDraft } from "@/modules/change-requests/authorization";
 import {
@@ -44,6 +45,12 @@ import {
   purchasingReviewAvailable,
   purchasingReviewState,
 } from "@/modules/purchasing-review/domain";
+import {
+  isTaskOverdue,
+  sortTasks,
+  taskSummary,
+  type TaskStatusKey,
+} from "@/modules/tasks/domain";
 
 const tabs = [
   "Übersicht",
@@ -93,6 +100,10 @@ export default async function RequestDetailPage({
       technicalReview: { include: { completedBy: true } },
       avorImpactReview: { include: { completedBy: true } },
       purchasingReview: { include: { completedBy: true, orderedBy: true } },
+      tasks: {
+        include: { responsibleUser: true },
+        orderBy: { createdAt: "desc" },
+      },
       attachments: {
         where: { deletedAt: null },
         orderBy: { uploadedAt: "desc" },
@@ -101,6 +112,11 @@ export default async function RequestDetailPage({
     },
   });
   if (!request) notFound();
+  const activeUsers = await db.user.findMany({
+    where: { active: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
   const editable = canEditDraft(user, request);
   const current = request.approvals.filter(
     (a) => a.cycle === request.approvalCycle,
@@ -180,6 +196,7 @@ export default async function RequestDetailPage({
             <TechnicalSummary review={request.technicalReview} />
             <AvorSummary review={request.avorImpactReview} />
             <PurchasingSummary review={request.purchasingReview} />
+            <TaskSummary tasks={request.tasks} />
           </div>
         </>
       ) : tab === "Freigaben" ? (
@@ -249,6 +266,23 @@ export default async function RequestDetailPage({
           }
           editable={canEditPurchasingReview(user, request.status)}
           available={purchasingReviewAvailable(request.status)}
+        />
+      ) : tab === "Aufgaben" ? (
+        <TaskManagement
+          requestId={id}
+          users={activeUsers}
+          currentUserId={user.id}
+          isAdmin={user.roles.includes("ADMINISTRATOR")}
+          tasks={sortTasks(
+            request.tasks.map((task) => ({
+              ...task,
+              status: task.status as TaskStatusKey,
+            })),
+          ).map((task) => ({
+            ...task,
+            dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
+            overdue: isTaskOverdue(task.dueDate, task.status),
+          }))}
         />
       ) : tab === "Anhänge" ? (
         <Attachments
@@ -582,6 +616,52 @@ function PurchasingSummary({
           </dl>
         </>
       )}
+    </Card>
+  );
+}
+function TaskSummary({
+  tasks,
+}: {
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    dueDate: Date | null;
+    requiredForClosure: boolean;
+    responsibleUser: { name: string } | null;
+  }>;
+}) {
+  const normalized = tasks.map((task) => ({
+    ...task,
+    status: task.status as TaskStatusKey,
+  }));
+  const summary = taskSummary(normalized);
+  const next = sortTasks(normalized)
+    .filter((task) => task.status !== "DONE")
+    .slice(0, 3);
+  return (
+    <Card className="p-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">Aufgaben</h2>
+        <Link
+          href="?tab=Aufgaben"
+          className="text-sm font-semibold text-[#175f91]"
+        >
+          Alle Aufgaben anzeigen
+        </Link>
+      </div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+        <Item l="Offen" v={String(summary.open)} />
+        <Item l="Überfällig" v={String(summary.overdue)} />
+        <Item l="Blockiert" v={String(summary.blocked)} />
+        <Item l="Abschlussrelevant offen" v={String(summary.requiredOpen)} />
+      </dl>
+      {next.map((task) => (
+        <p key={task.id} className="mt-3 text-sm">
+          <span className="font-medium">{task.title}</span> ·{" "}
+          {task.responsibleUser?.name ?? "Nicht zugewiesen"}
+        </p>
+      ))}
     </Card>
   );
 }

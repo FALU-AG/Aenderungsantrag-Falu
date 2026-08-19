@@ -679,6 +679,106 @@ async function main() {
       completedAt: new Date(),
     },
   });
+  const taskExamples = [
+    {
+      request: "CR-2026-004",
+      title: "Zeichnung aktualisieren",
+      responsibleUserId: "sample-thomas-technik",
+      department: "TECHNICAL" as const,
+      dueDate: new Date("2026-08-28"),
+      priority: "HIGH" as const,
+      status: "OPEN" as const,
+      requiredForClosure: true,
+    },
+    {
+      request: "CR-2026-007",
+      title: "Lagerbestand disponieren",
+      responsibleUserId: "sample-anna-avor",
+      department: "AVOR" as const,
+      dueDate: new Date("2026-08-26"),
+      priority: "NORMAL" as const,
+      status: "IN_PROGRESS" as const,
+      requiredForClosure: true,
+    },
+    {
+      request: "CR-2026-016",
+      title: "Liefertermin bestätigen",
+      responsibleUserId: "sample-petra-einkauf",
+      department: "PURCHASING" as const,
+      dueDate: new Date("2026-08-22"),
+      priority: "HIGH" as const,
+      status: "OPEN" as const,
+      requiredForClosure: true,
+    },
+    {
+      request: "CR-2026-009",
+      title: "Montageanweisung prüfen",
+      responsibleUserId: "sample-max-muster",
+      department: "PRODUCTION_ASSEMBLY" as const,
+      dueDate: new Date("2026-08-01"),
+      priority: "NORMAL" as const,
+      status: "OPEN" as const,
+      requiredForClosure: true,
+    },
+    {
+      request: "CR-2026-010",
+      title: "Freigabe Sicherheitssteuerung",
+      responsibleUserId: "sample-thomas-technik",
+      department: "AUTOMATION_SOFTWARE" as const,
+      dueDate: new Date("2026-08-24"),
+      priority: "CRITICAL" as const,
+      status: "BLOCKED" as const,
+      requiredForClosure: true,
+    },
+    {
+      request: "CR-2026-008",
+      title: "Stückliste abgleichen",
+      responsibleUserId: "sample-anna-avor",
+      department: "AVOR" as const,
+      dueDate: new Date("2026-08-15"),
+      priority: "NORMAL" as const,
+      status: "DONE" as const,
+      requiredForClosure: true,
+      completedById: "sample-anna-avor",
+      completedAt: new Date("2026-08-14"),
+    },
+    {
+      request: "CR-2026-011",
+      title: "Kundeninformation vorbereiten",
+      responsibleUserId: "sample-max-muster",
+      department: "SERVICE" as const,
+      dueDate: null,
+      priority: "LOW" as const,
+      status: "OPEN" as const,
+      requiredForClosure: false,
+    },
+    {
+      request: "CR-2026-017",
+      title: "Verkaufsunterlagen aktualisieren",
+      responsibleUserId: "sample-max-muster",
+      department: "SALES" as const,
+      dueDate: new Date("2026-09-01"),
+      priority: "LOW" as const,
+      status: "OPEN" as const,
+      requiredForClosure: false,
+    },
+  ];
+  for (const example of taskExamples) {
+    const changeRequestId = seeded.get(example.request)!.id;
+    const existing = await prisma.task.findFirst({
+      where: { changeRequestId, title: example.title },
+    });
+    const data = {
+      ...example,
+      request: undefined,
+      changeRequestId,
+      createdById: "sample-admin-falu",
+      description: `Beispielaufgabe für ${example.request}.`,
+    };
+    if (existing)
+      await prisma.task.update({ where: { id: existing.id }, data });
+    else await prisma.task.create({ data });
+  }
   await prisma.changeRequestCounter.upsert({
     where: { year: 2026 },
     update: { nextNumber: { set: 19 } },

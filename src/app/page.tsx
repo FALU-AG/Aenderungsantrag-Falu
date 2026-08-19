@@ -3,9 +3,9 @@ import {
   ClipboardCheck,
   Clock3,
   Cog,
-  RefreshCcw,
   Wrench,
   ShoppingCart,
+  AlertTriangle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PageHeading } from "@/components/page-heading";
@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/server/db/client";
 import type { ChangeRequestStatusKey } from "@/modules/workflow/status";
 export default async function DashboardPage() {
-  const [open, reviewing, implementation, changesRequired, purchasing, recent] =
+  const [open, reviewing, implementation, overdueTasks, purchasing, recent] =
     await Promise.all([
       db.changeRequest.count({ where: { status: { not: "CLOSED" } } }),
       db.changeRequest.findMany({
@@ -33,7 +33,12 @@ export default async function DashboardPage() {
           },
         },
       }),
-      db.changeRequest.count({ where: { status: "CHANGES_REQUESTED" } }),
+      db.task.count({
+        where: {
+          dueDate: { lt: new Date(new Date().setHours(0, 0, 0, 0)) },
+          status: { not: "DONE" },
+        },
+      }),
       db.changeRequest.count({ where: { status: "PURCHASING_PROCUREMENT" } }),
       db.changeRequest.findMany({
         take: 6,
@@ -54,9 +59,9 @@ export default async function DashboardPage() {
     { label: "Warten auf AVOR", value: avor, icon: Clock3 },
     { label: "Warten auf Technik", value: technical, icon: Wrench },
     {
-      label: "Änderung erforderlich",
-      value: changesRequired,
-      icon: RefreshCcw,
+      label: "Überfällige Aufgaben",
+      value: overdueTasks,
+      icon: AlertTriangle,
     },
     { label: "In Umsetzung", value: implementation, icon: Cog },
     { label: "Einkauf offen", value: purchasing, icon: ShoppingCart },
