@@ -41,6 +41,14 @@ export async function createTask(
 ): Promise<TaskActionState> {
   const user = await getCurrentUser();
   requirePermission(user, "TASK_CREATE");
+  const request = await db.changeRequest.findUniqueOrThrow({
+    where: { id: requestId },
+    select: { status: true },
+  });
+  if (request.status === "CLOSED")
+    return {
+      message: "Abgeschlossene Änderungsanträge sind schreibgeschützt.",
+    };
   const parsed = taskSchema.safeParse(input(f));
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors };
   const responsible = await db.user.findFirst({
@@ -92,8 +100,13 @@ export async function updateTask(
   await db.$transaction(async (tx) => {
     const old = await tx.task.findUniqueOrThrow({
       where: { id: taskId },
-      include: { responsibleUser: true },
+      include: {
+        responsibleUser: true,
+        changeRequest: { select: { status: true } },
+      },
     });
+    if (old.changeRequest.status === "CLOSED")
+      throw new Error("Abgeschlossene Änderungsanträge sind schreibgeschützt.");
     const access = taskAccess(user, {
       ...old,
       status: old.status as TaskStatusKey,
@@ -205,7 +218,12 @@ export async function deleteOpenTask(taskId: string) {
   const user = await getCurrentUser();
   requirePermission(user, "TASK_UPDATE");
   await db.$transaction(async (tx) => {
-    const task = await tx.task.findUniqueOrThrow({ where: { id: taskId } });
+    const task = await tx.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: { changeRequest: { select: { status: true } } },
+    });
+    if (task.changeRequest.status === "CLOSED")
+      throw new Error("Abgeschlossene Änderungsanträge sind schreibgeschützt.");
     if (
       !taskAccess(user, { ...task, status: task.status as TaskStatusKey })
         .canDelete

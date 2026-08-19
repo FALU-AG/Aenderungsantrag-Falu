@@ -67,7 +67,7 @@ export async function savePurchasingReview(
     async (tx) => {
       const current = await tx.changeRequest.findUniqueOrThrow({
         where: { id: requestId },
-        select: { status: true },
+        select: { status: true, finalReviewCycle: true },
       });
       const existing = await tx.purchasingReview.findUnique({
         where: { changeRequestId: requestId },
@@ -143,7 +143,7 @@ export async function savePurchasingReview(
           where: { id: requestId, status: "PURCHASING_PROCUREMENT" },
           data: { status: "FINAL_REVIEW", version: { increment: 1 } },
         });
-        if (changed.count === 1)
+        if (changed.count === 1) {
           await tx.auditEvent.create({
             data: {
               changeRequestId: requestId,
@@ -156,6 +156,18 @@ export async function savePurchasingReview(
               details: { from: "PURCHASING_PROCUREMENT", to: "FINAL_REVIEW" },
             },
           });
+          await tx.auditEvent.create({
+            data: {
+              changeRequestId: requestId,
+              userId: user.id,
+              action: "FINAL_REVIEW_CYCLE_STARTED",
+              entityType: "ChangeRequest",
+              entityId: requestId,
+              summary: `Abschlussprüfung Zyklus ${current.finalReviewCycle} wurde gestartet.`,
+              details: { cycle: current.finalReviewCycle },
+            },
+          });
+        }
       }
     },
     { isolationLevel: "Serializable" },

@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/server/db/client";
 import type { ChangeRequestStatusKey } from "@/modules/workflow/status";
 export default async function DashboardPage() {
-  const [open, reviewing, implementation, overdueTasks, purchasing, recent] =
+  const [open, reviewing, finalReview, overdueTasks, purchasing, recent] =
     await Promise.all([
       db.changeRequest.count({ where: { status: { not: "CLOSED" } } }),
       db.changeRequest.findMany({
@@ -26,13 +26,7 @@ export default async function DashboardPage() {
           },
         },
       }),
-      db.changeRequest.count({
-        where: {
-          status: {
-            in: ["APPROVED_FOR_IMPLEMENTATION", "AVOR_PRODUCTION_PREPARATION"],
-          },
-        },
-      }),
+      db.changeRequest.count({ where: { status: "FINAL_REVIEW" } }),
       db.task.count({
         where: {
           dueDate: { lt: new Date(new Date().setHours(0, 0, 0, 0)) },
@@ -63,7 +57,7 @@ export default async function DashboardPage() {
       value: overdueTasks,
       icon: AlertTriangle,
     },
-    { label: "In Umsetzung", value: implementation, icon: Cog },
+    { label: "Abschlussprüfung offen", value: finalReview, icon: Cog },
     { label: "Einkauf offen", value: purchasing, icon: ShoppingCart },
   ];
   return (

@@ -11,6 +11,7 @@ import { TechnicalReviewForm } from "@/components/technical-review-form";
 import { AvorReviewForm } from "@/components/avor-review-form";
 import { PurchasingReviewForm } from "@/components/purchasing-review-form";
 import { TaskManagement } from "@/components/task-management";
+import { FinalReviewPanel } from "@/components/final-review-panel";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { canEditDraft } from "@/modules/change-requests/authorization";
 import {
@@ -51,6 +52,11 @@ import {
   taskSummary,
   type TaskStatusKey,
 } from "@/modules/tasks/domain";
+import {
+  canFinalApprove,
+  canRequestFinalChanges,
+  closurePrerequisites,
+} from "@/modules/final-review/domain";
 
 const tabs = [
   "Übersicht",
@@ -59,6 +65,7 @@ const tabs = [
   "AVOR",
   "Einkauf",
   "Aufgaben",
+  "Abschlussprüfung",
   "Anhänge",
   "Kommentare",
   "Historie",
@@ -97,6 +104,11 @@ export default async function RequestDetailPage({
         include: { decisionUser: true },
         orderBy: [{ cycle: "desc" }, { type: "asc" }],
       },
+      finalApprovals: {
+        include: { approvedBy: true },
+        orderBy: [{ cycle: "desc" }, { type: "asc" }],
+      },
+      closedBy: true,
       technicalReview: { include: { completedBy: true } },
       avorImpactReview: { include: { completedBy: true } },
       purchasingReview: { include: { completedBy: true, orderedBy: true } },
@@ -197,6 +209,10 @@ export default async function RequestDetailPage({
             <AvorSummary review={request.avorImpactReview} />
             <PurchasingSummary review={request.purchasingReview} />
             <TaskSummary tasks={request.tasks} />
+            {(request.status === "FINAL_REVIEW" ||
+              request.status === "CLOSED") && (
+              <FinalStatusSummary request={request} />
+            )}
           </div>
         </>
       ) : tab === "Freigaben" ? (
@@ -273,6 +289,7 @@ export default async function RequestDetailPage({
           users={activeUsers}
           currentUserId={user.id}
           isAdmin={user.roles.includes("ADMINISTRATOR")}
+          readOnly={request.status === "CLOSED"}
           tasks={sortTasks(
             request.tasks.map((task) => ({
               ...task,
@@ -282,7 +299,40 @@ export default async function RequestDetailPage({
             ...task,
             dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
             overdue: isTaskOverdue(task.dueDate, task.status),
+            closed: request.status === "CLOSED",
           }))}
+        />
+      ) : tab === "Abschlussprüfung" ? (
+        <FinalReviewPanel
+          requestId={id}
+          status={request.status}
+          cycle={request.finalReviewCycle}
+          finalComment={request.finalComment}
+          prerequisites={closurePrerequisites({
+            technicalCompleted: Boolean(request.technicalReview?.completed),
+            avorCompleted: Boolean(request.avorImpactReview?.completed),
+            purchasingCompleted: Boolean(request.purchasingReview?.completed),
+            blockingTasks: request.tasks.filter(
+              (task) => task.requiredForClosure && task.status !== "DONE",
+            ).length,
+          })}
+          blockingTasks={request.tasks
+            .filter((task) => task.requiredForClosure && task.status !== "DONE")
+            .map((task) => ({
+              ...task,
+              dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
+            }))}
+          approvals={request.finalApprovals.map((approval) => ({
+            ...approval,
+            type: approval.type as "AVOR" | "TECHNICAL",
+            approvedAt: formatDate(approval.approvedAt),
+          }))}
+          canApproveAvor={canFinalApprove(user, "AVOR")}
+          canApproveTechnical={canFinalApprove(user, "TECHNICAL")}
+          canRequestChanges={canRequestFinalChanges(user)}
+          isAdmin={user.roles.includes("ADMINISTRATOR")}
+          closedAt={request.closedAt ? formatDate(request.closedAt) : null}
+          closedBy={request.closedBy?.name ?? null}
         />
       ) : tab === "Anhänge" ? (
         <Attachments
@@ -665,6 +715,77 @@ function TaskSummary({
     </Card>
   );
 }
+function FinalStatusSummary({
+  request,
+}: {
+  request: {
+    status: string;
+    finalReviewCycle: number;
+    finalComment: string | null;
+    closedAt: Date | null;
+    closedBy: { name: string } | null;
+    finalApprovals: Array<{
+      id: string;
+      cycle: number;
+      type: string;
+      approvedAt: Date;
+      approvedBy: { name: string };
+    }>;
+  };
+}) {
+  const current = request.finalApprovals.filter(
+    (a) => a.cycle === request.finalReviewCycle,
+  );
+  return (
+    <Card
+      className={`p-6 ${request.status === "CLOSED" ? "border-emerald-200 bg-emerald-50" : "border-violet-200"}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            Zyklus {request.finalReviewCycle}
+          </p>
+          <h2 className="mt-1 text-lg font-bold">
+            {request.status === "CLOSED" ? "Abgeschlossen" : "Abschlussprüfung"}
+          </h2>
+        </div>
+        <Link
+          href="?tab=Abschlusspr%C3%BCfung"
+          className="text-sm font-semibold text-[#175f91]"
+        >
+          Abschlussprüfung anzeigen
+        </Link>
+      </div>
+      {request.status === "CLOSED" && (
+        <p className="mt-3 text-sm">
+          Abgeschlossen {request.closedAt ? formatDate(request.closedAt) : "–"}{" "}
+          · ausgelöst durch {request.closedBy?.name ?? "–"}
+        </p>
+      )}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {(["AVOR", "TECHNICAL"] as const).map((type) => {
+          const approval = current.find((a) => a.type === type);
+          return (
+            <div key={type} className="rounded-md border bg-white p-3 text-sm">
+              <span className="font-medium">
+                {type === "AVOR" ? "AVOR" : "Technik"}:
+              </span>{" "}
+              {approval
+                ? `Freigegeben von ${approval.approvedBy.name} am ${formatDate(approval.approvedAt)}`
+                : "Offen"}
+            </div>
+          );
+        })}
+      </div>
+      {request.finalComment && (
+        <p className="mt-4 text-sm">
+          <span className="font-medium">Abschlussbemerkung:</span>{" "}
+          {request.finalComment}
+        </p>
+      )}
+    </Card>
+  );
+}
 function Overview({
   request,
   current,
@@ -681,17 +802,21 @@ function Overview({
   rejectionComments: string[];
 }) {
   const message =
-    request.status === "CHANGES_REQUESTED"
-      ? "Dieser Änderungsantrag muss überarbeitet werden."
-      : request.status === "APPROVED_FOR_IMPLEMENTATION"
-        ? "Der Änderungsantrag wurde zur Umsetzung freigegeben."
-        : request.status === "UNDER_REVIEW"
-          ? "Dieser Änderungsantrag wartet auf Freigaben."
-          : "Der Änderungsantrag befindet sich im Entwurf.";
+    request.status === "CLOSED"
+      ? "Dieser Änderungsantrag ist abgeschlossen."
+      : request.status === "FINAL_REVIEW"
+        ? "Der Änderungsantrag befindet sich in der Abschlussprüfung."
+        : request.status === "CHANGES_REQUESTED"
+          ? "Dieser Änderungsantrag muss überarbeitet werden."
+          : request.status === "APPROVED_FOR_IMPLEMENTATION"
+            ? "Der Änderungsantrag wurde zur Umsetzung freigegeben."
+            : request.status === "UNDER_REVIEW"
+              ? "Dieser Änderungsantrag wartet auf Freigaben."
+              : "Der Änderungsantrag befindet sich im Entwurf.";
   return (
     <div className="space-y-5">
       <Card
-        className={`p-5 ${request.status === "CHANGES_REQUESTED" ? "border-red-200 bg-red-50" : ""}`}
+        className={`p-5 ${request.status === "CHANGES_REQUESTED" ? "border-red-200 bg-red-50" : request.status === "CLOSED" ? "border-emerald-200 bg-emerald-50" : ""}`}
       >
         <p className="font-semibold">{message}</p>
         {rejectionComments.map((c, i) => (

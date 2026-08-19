@@ -33,6 +33,7 @@ export type TaskView = {
   requiredForClosure: boolean;
   createdById: string;
   overdue: boolean;
+  closed?: boolean;
   changeRequest?: {
     id: string;
     number: string;
@@ -46,28 +47,33 @@ export function TaskManagement({
   users,
   currentUserId,
   isAdmin,
+  readOnly = false,
 }: {
   requestId: string;
   tasks: TaskView[];
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-5">
-      <details>
-        <summary className="ml-auto w-fit cursor-pointer list-none rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white">
-          Aufgabe erstellen
-        </summary>
-        <div className="mt-5">
-          <CreateTaskForm requestId={requestId} users={users} />
-        </div>
-      </details>
+      {!readOnly && (
+        <details>
+          <summary className="ml-auto w-fit cursor-pointer list-none rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white">
+            Aufgabe erstellen
+          </summary>
+          <div className="mt-5">
+            <CreateTaskForm requestId={requestId} users={users} />
+          </div>
+        </details>
+      )}
       <TaskList
         tasks={tasks}
         users={users}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
+        readOnly={readOnly}
       />
     </div>
   );
@@ -77,11 +83,13 @@ export function TaskList({
   users,
   currentUserId,
   isAdmin,
+  readOnly = false,
 }: {
   tasks: TaskView[];
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  readOnly?: boolean;
 }) {
   const active = tasks.filter((t) => t.status !== "DONE"),
     done = tasks.filter((t) => t.status === "DONE");
@@ -105,6 +113,7 @@ export function TaskList({
                 users={users}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -123,6 +132,7 @@ export function TaskList({
                 users={users}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -180,19 +190,22 @@ function TaskCard({
   users,
   currentUserId,
   isAdmin,
+  readOnly,
 }: {
   task: TaskView;
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  readOnly: boolean;
 }) {
   const [state, action, pending] = useActionState(
     updateTask.bind(null, task.id),
     {} as TaskActionState,
   );
-  const full = isAdmin || task.createdById === currentUserId,
+  const locked = readOnly || Boolean(task.closed);
+  const full = !locked && (isAdmin || task.createdById === currentUserId),
     responsible = task.responsibleUserId === currentUserId,
-    editable = full || responsible;
+    editable = !locked && (full || responsible);
   return (
     <Card
       className={`p-5 ${task.overdue ? "border-red-300 bg-red-50/40" : ""}`}

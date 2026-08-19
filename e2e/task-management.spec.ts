@@ -26,7 +26,7 @@ test.afterAll(async () => prisma.$disconnect());
 test("erstellt, bearbeitet und erledigt eine zugewiesene Aufgabe", async ({
   page,
 }) => {
-  await page.goto("/change-requests");
+  await page.goto("/change-requests?q=CR-2026-004");
   await page.getByRole("link", { name: "CR-2026-004" }).click();
   await page.getByRole("link", { name: "Aufgaben", exact: true }).click();
   await expect(page).toHaveURL(/tab=Aufgaben/);

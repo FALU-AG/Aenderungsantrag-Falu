@@ -73,6 +73,7 @@ model User {
   roles                UserRole[]
   requests             ChangeRequest[]    @relation("Applicant")
   approvals            Approval[]         @relation("ApprovalDecisionUser")
+  finalApprovals       FinalApproval[]    @relation("FinalApprovalUser")
   technicalReviews     TechnicalReview[]  @relation("TechnicalReviewCompletedBy")
   avorReviews          AvorImpactReview[] @relation("AvorReviewCompletedBy")
   purchasingReviews    PurchasingReview[] @relation("PurchasingReviewCompletedBy")
@@ -142,6 +143,8 @@ model ChangeRequest {
   otherReasonText    String?
   status             ChangeRequestStatus   @default(DRAFT)
   approvalCycle      Int                   @default(1)
+  finalReviewCycle   Int                   @default(1)
+  finalComment       String?
   version            Int                   @default(1)
   submittedAt        DateTime?
   closedAt           DateTime?
@@ -154,6 +157,7 @@ model ChangeRequest {
   closedBy           User?                 @relation("ClosedBy", fields: [closedById], references: [id])
   reasons            ChangeRequestReason[]
   approvals          Approval[]
+  finalApprovals     FinalApproval[]
   technicalReview    TechnicalReview?
   avorImpactReview   AvorImpactReview?
   purchasingReview   PurchasingReview?
@@ -193,6 +197,22 @@ model Approval {
 
   @@unique([changeRequestId, type, cycle])
   @@index([status, type])
+}
+
+model FinalApproval {
+  id              String        @id @default(cuid())
+  changeRequestId String
+  cycle           Int
+  type            ApprovalType
+  approvedById    String
+  approvedAt      DateTime      @default(now())
+  comment         String?
+  createdAt       DateTime      @default(now())
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id])
+  approvedBy      User          @relation("FinalApprovalUser", fields: [approvedById], references: [id])
+
+  @@unique([changeRequestId, cycle, type])
+  @@index([changeRequestId, cycle])
 }
 
 model TechnicalReview {

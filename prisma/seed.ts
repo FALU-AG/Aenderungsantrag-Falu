@@ -297,14 +297,87 @@ async function main() {
       status: "PURCHASING_PROCUREMENT" as const,
       reasonIndexes: [7],
     },
+    {
+      number: "CR-2026-019",
+      title: "Abschlussprüfung Führungsrolle",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("CB1"),
+      description: "Beide Abschlussfreigaben sind offen.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [1],
+    },
+    {
+      number: "CR-2026-020",
+      title: "Abschlussprüfung Sensorik",
+      applicantId: "sample-anna-avor",
+      machineTypeId: machineId("CT"),
+      description: "AVOR hat die Abschlussfreigabe bereits erteilt.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [3],
+    },
+    {
+      number: "CR-2026-021",
+      title: "Abschluss durch Pflichtaufgabe blockiert",
+      applicantId: "sample-thomas-technik",
+      machineTypeId: machineId("CS-2500"),
+      description: "Eine abschlussrelevante Aufgabe ist noch offen.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [4],
+    },
+    {
+      number: "CR-2026-022",
+      title: "Abschlussänderungen historisch",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("SV-2X"),
+      description: "Im ersten Abschlusszyklus wurden Änderungen angefordert.",
+      status: "APPROVED_FOR_IMPLEMENTATION" as const,
+      reasonIndexes: [0],
+      finalReviewCycle: 2,
+    },
+    {
+      number: "CR-2026-023",
+      title: "Zweite Abschlussprüfung",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("BL-16"),
+      description: "Der Antrag befindet sich im zweiten Abschlusszyklus.",
+      status: "FINAL_REVIEW" as const,
+      reasonIndexes: [8],
+      finalReviewCycle: 2,
+    },
+    {
+      number: "CR-2026-024",
+      title: "Abgeschlossener Nachrüstsatz",
+      applicantId: "sample-max-muster",
+      machineTypeId: machineId("ABS"),
+      description: "Der Änderungsantrag wurde vollständig abgeschlossen.",
+      status: "CLOSED" as const,
+      reasonIndexes: [2],
+      finalReviewCycle: 1,
+    },
+    {
+      number: "CR-2026-025",
+      title: "Administrativ wiedereröffnete Änderung",
+      applicantId: "sample-anna-avor",
+      machineTypeId: machineId("CT"),
+      description:
+        "Ein abgeschlossener Antrag wurde administrativ wieder geöffnet.",
+      status: "APPROVED_FOR_IMPLEMENTATION" as const,
+      reasonIndexes: [7],
+      finalReviewCycle: 2,
+    },
   ];
   for (const sample of samples) {
     const cycle = (sample as { approvalCycle?: number }).approvalCycle ?? 1;
+    const finalReviewCycle =
+      (sample as { finalReviewCycle?: number }).finalReviewCycle ?? 1;
     const request = await prisma.changeRequest.upsert({
       where: { number: sample.number },
       update: {
         title: sample.title,
         status: sample.status,
+        finalReviewCycle,
+        closedAt: null,
+        closedById: null,
         applicantName: applicantName(sample.applicantId),
         articleNumber: `ART-${sample.number.slice(-3)}`,
         articleDescription: sample.title,
@@ -321,6 +394,7 @@ async function main() {
         description: sample.description,
         status: sample.status,
         approvalCycle: cycle,
+        finalReviewCycle,
         submittedAt: sample.status !== "DRAFT" ? new Date() : null,
         reasons: {
           create: sample.reasonIndexes.map((index) => ({
@@ -762,6 +836,16 @@ async function main() {
       status: "OPEN" as const,
       requiredForClosure: false,
     },
+    {
+      request: "CR-2026-021",
+      title: "Abschlussdokumentation fertigstellen",
+      responsibleUserId: "sample-thomas-technik",
+      department: "TECHNICAL" as const,
+      dueDate: new Date("2026-08-25"),
+      priority: "HIGH" as const,
+      status: "OPEN" as const,
+      requiredForClosure: true,
+    },
   ];
   for (const example of taskExamples) {
     const changeRequestId = seeded.get(example.request)!.id;
@@ -779,10 +863,149 @@ async function main() {
       await prisma.task.update({ where: { id: existing.id }, data });
     else await prisma.task.create({ data });
   }
+  for (const number of [
+    "CR-2026-019",
+    "CR-2026-020",
+    "CR-2026-021",
+    "CR-2026-023",
+    "CR-2026-024",
+  ]) {
+    const changeRequestId = seeded.get(number)!.id;
+    await prisma.technicalReview.upsert({
+      where: { changeRequestId },
+      update: {
+        completed: true,
+        completedById: "sample-thomas-technik",
+        completedAt: new Date(),
+      },
+      create: {
+        changeRequestId,
+        ...reviewBase,
+        completed: true,
+        completedById: "sample-thomas-technik",
+        completedAt: new Date(),
+      },
+    });
+    await prisma.avorImpactReview.upsert({
+      where: { changeRequestId },
+      update: {
+        completed: true,
+        completedById: "sample-anna-avor",
+        completedAt: new Date(),
+      },
+      create: {
+        changeRequestId,
+        ...avorBase,
+        completed: true,
+        completedById: "sample-anna-avor",
+        completedAt: new Date(),
+      },
+    });
+    await prisma.purchasingReview.upsert({
+      where: { changeRequestId },
+      update: {
+        purchasingRequired: false,
+        orderRequired: false,
+        completed: true,
+        completedById: "sample-petra-einkauf",
+        completedAt: new Date(),
+      },
+      create: {
+        changeRequestId,
+        purchasingRequired: false,
+        orderRequired: false,
+        completed: true,
+        completedById: "sample-petra-einkauf",
+        completedAt: new Date(),
+      },
+    });
+  }
+  const seedFinalApproval = async (
+    number: string,
+    cycle: number,
+    type: "AVOR" | "TECHNICAL",
+    approvedById: string,
+  ) =>
+    prisma.finalApproval.upsert({
+      where: {
+        changeRequestId_cycle_type: {
+          changeRequestId: seeded.get(number)!.id,
+          cycle,
+          type,
+        },
+      },
+      update: {},
+      create: {
+        changeRequestId: seeded.get(number)!.id,
+        cycle,
+        type,
+        approvedById,
+        comment: "Fiktive Abschlussfreigabe.",
+      },
+    });
+  await seedFinalApproval("CR-2026-020", 1, "AVOR", "sample-anna-avor");
+  await seedFinalApproval("CR-2026-022", 1, "AVOR", "sample-anna-avor");
+  await seedFinalApproval("CR-2026-023", 1, "AVOR", "sample-anna-avor");
+  await seedFinalApproval("CR-2026-024", 1, "AVOR", "sample-anna-avor");
+  await seedFinalApproval(
+    "CR-2026-024",
+    1,
+    "TECHNICAL",
+    "sample-thomas-technik",
+  );
+  await seedFinalApproval("CR-2026-025", 1, "AVOR", "sample-anna-avor");
+  await seedFinalApproval(
+    "CR-2026-025",
+    1,
+    "TECHNICAL",
+    "sample-thomas-technik",
+  );
+  await prisma.changeRequest.update({
+    where: { number: "CR-2026-024" },
+    data: {
+      closedAt: new Date("2026-08-18T12:32:00Z"),
+      closedById: "sample-thomas-technik",
+      finalComment: "Umsetzung und Beschaffung sind vollständig abgeschlossen.",
+    },
+  });
+  for (const historical of [
+    {
+      number: "CR-2026-022",
+      action: "FINAL_REVIEW_CHANGES_REQUIRED",
+      summary:
+        "Thomas Technik hat weitere Änderungen angefordert. Grund: Dokumentation ergänzen.",
+    },
+    {
+      number: "CR-2026-025",
+      action: "FINAL_REVIEW_REOPENED",
+      summary:
+        "Admin Falu hat den abgeschlossenen Änderungsantrag erneut geöffnet. Grund: Nachtrag erforderlich.",
+    },
+  ])
+    if (
+      (await prisma.auditEvent.count({
+        where: {
+          changeRequestId: seeded.get(historical.number)!.id,
+          action: historical.action,
+        },
+      })) === 0
+    )
+      await prisma.auditEvent.create({
+        data: {
+          changeRequestId: seeded.get(historical.number)!.id,
+          userId: historical.number.endsWith("22")
+            ? "sample-thomas-technik"
+            : "sample-admin-falu",
+          action: historical.action,
+          entityType: "ChangeRequest",
+          entityId: seeded.get(historical.number)!.id,
+          summary: historical.summary,
+        },
+      });
   await prisma.changeRequestCounter.upsert({
     where: { year: 2026 },
-    update: { nextNumber: { set: 19 } },
-    create: { year: 2026, nextNumber: 19 },
+    update: { nextNumber: { set: 26 } },
+    create: { year: 2026, nextNumber: 26 },
   });
 }
 

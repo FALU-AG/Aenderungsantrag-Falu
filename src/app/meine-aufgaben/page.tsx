@@ -52,6 +52,7 @@ export default async function TasksPage({
             id: true,
             number: true,
             title: true,
+            status: true,
             machineType: { select: { code: true } },
           },
         },
@@ -69,6 +70,7 @@ export default async function TasksPage({
     ...t,
     dueDate: t.dueDate?.toISOString().slice(0, 10) ?? null,
     overdue: isTaskOverdue(t.dueDate, t.status),
+    closed: t.changeRequest.status === "CLOSED",
   }));
   return (
     <>
