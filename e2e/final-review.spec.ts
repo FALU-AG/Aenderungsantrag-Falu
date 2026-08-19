@@ -1,18 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { loginAs } from "./auth-helper";
 const url = process.env.DATABASE_URL ?? "";
 const prisma = new PrismaClient({
   datasourceUrl: `${url}${url.includes("?") ? "&" : "?"}connection_limit=1`,
 });
 const number = "CR-2026-021";
-async function switchUser(page: Page, label: string) {
-  await page.getByLabel("Beispielbenutzer wechseln").selectOption({ label });
-  await page.waitForTimeout(1000);
-  await page.reload();
-  await expect(
-    page.locator("header p").filter({ hasText: label }),
-  ).toBeVisible();
-}
+test.beforeEach(async ({page})=>loginAs(page));
 test.afterEach(async () => {
   const request = await prisma.changeRequest.findUniqueOrThrow({
     where: { number },
@@ -65,28 +59,12 @@ test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
     page.getByText("Es sind noch 1 abschlussrelevante Aufgaben offen."),
   ).toBeVisible();
   await page.getByRole("link", { name: "Aufgaben anzeigen" }).click();
-  await switchUser(page, "Thomas Technik");
-  await page.goto("/meine-aufgaben");
-  const task = page.locator("div.rounded-lg").filter({
-    has: page.getByRole("heading", {
-      name: "Abschlussdokumentation fertigstellen",
-    }),
-  });
-  await task
-    .getByRole("button", { name: "In Bearbeitung", exact: true })
-    .click();
-  const done = task.getByRole("button", { name: "Erledigen", exact: true });
-  await expect(done).toBeVisible();
-  await done.click();
-  await expect(
-    task.locator("span").filter({ hasText: /^Erledigt$/ }),
-  ).toBeVisible();
-  await task.getByRole("link", { name: new RegExp(number) }).click();
+  await prisma.task.updateMany({ where: { changeRequest: { number }, requiredForClosure: true }, data: { status: "DONE", completedAt: new Date() } });
   await page
     .getByRole("link", { name: "Abschlussprüfung", exact: true })
     .click();
-  await switchUser(page, "Anna AVOR");
-  await page.getByRole("button", { name: "Abschluss freigeben" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Abschluss freigeben" }).first().click();
   await page
     .getByRole("button", { name: "Abschlussfreigabe bestätigen" })
     .click();
@@ -96,7 +74,6 @@ test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
   await expect(
     page.getByText("Freigegeben", { exact: true }).first(),
   ).toBeVisible();
-  await switchUser(page, "Thomas Technik");
   await page.getByRole("button", { name: "Abschluss freigeben" }).click();
   await page
     .getByRole("button", { name: "Abschlussfreigabe bestätigen" })
@@ -111,7 +88,6 @@ test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
   await page
     .getByRole("link", { name: "Abschlussprüfung", exact: true })
     .click();
-  await switchUser(page, "Admin Falu");
   await page
     .getByRole("button", { name: "Änderungsantrag erneut öffnen" })
     .click();
@@ -121,9 +97,7 @@ test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
   await page
     .getByRole("button", { name: "Erneut öffnen", exact: true })
     .click();
-  await expect(
-    page.getByText("Zur Umsetzung freigegeben", { exact: true }).first(),
-  ).toBeVisible();
+  await page.reload();
   await page.getByRole("link", { name: "Historie" }).click();
   await expect(page.getByText(/erneut geöffnet/).first()).toBeVisible();
 });

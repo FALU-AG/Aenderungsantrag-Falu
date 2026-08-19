@@ -110,3 +110,31 @@ Nach der Freigabe dokumentiert die Technik Sicherheit, Austauschbarkeit, Auswirk
 ## Phase-5-AVOR-Auswirkungsprüfung
 
 AVOR und Administration erfassen parallel zur technischen Prüfung die Auswirkungen auf Lagerbestand, Bestellungen, Produktionsaufträge und ausgelieferte Maschinen. Teilstände, Abschluss und begründetes Wiederöffnen werden vollständig auditiert. Sobald eine der beiden Umsetzungsprüfungen beginnt, wechselt der Antrag in `AVOR / Produktionsvorbereitung`; nach Abschluss beider Prüfungen erfolgt der transaktional abgesicherte Übergang zu `Einkauf / Beschaffung`.
+# Authentifizierung und Benutzerverwaltung (Phase 9)
+
+Die Anwendung verwendet eine interne E-Mail-/Passwort-Anmeldung. Passwörter werden mit bcrypt (Kostenfaktor 12) gehasht. Ein kryptografisch zufälliger Session-Token liegt in einem `HttpOnly`-, `SameSite=Lax`-Cookie (in Produktion zusätzlich `Secure`); PostgreSQL speichert ausschließlich dessen SHA-256-Hash. Sessions laufen nach sieben Tagen ab und werden bei Abmeldung, Deaktivierung oder Passwort-Reset invalidiert. Alle fachlichen Seiten und Server-Aktionen prüfen die Identität serverseitig.
+
+Sichtbare Rollen sind ausschließlich `Mitarbeiter`, `AVOR`, `Technik` und `Administrator`. Der Prozessschritt **Einkauf / Beschaffung** bleibt bestehen und kann von AVOR oder Administrator bearbeitet werden. Historische Einkauf-Rollen werden durch die Migration in AVOR überführt; Audittexte bleiben unverändert.
+
+Administratoren verwalten weitere Konten unter `/admin/users`. Dort können sie Benutzer erstellen, bearbeiten, aktivieren/deaktivieren und ein temporäres Passwort setzen. Nach einem Reset ist beim nächsten Login eine Passwortänderung erforderlich. Historische Benutzer werden nie gelöscht, und der letzte aktive Administrator kann weder deaktiviert noch seiner Administratorrolle beraubt werden.
+
+## Ersten Produktions-Administrator einrichten
+
+In Railway einmalig folgende Variablen setzen (Werte nicht protokollieren oder committen):
+
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_PASSWORD` (mindestens 10 Zeichen)
+- `BOOTSTRAP_ADMIN_FIRST_NAME`
+- `BOOTSTRAP_ADMIN_LAST_NAME`
+
+Danach nicht-destruktiv ausführen:
+
+```bash
+npx prisma migrate deploy
+NODE_ENV=production npm run db:seed
+npm run db:bootstrap-admin
+```
+
+Existiert bereits ein aktiver Administrator, ändert der Bootstrap keine Zugangsdaten. `SEED_DEMO_USERS=true` ist ausschließlich für explizite Demo-Umgebungen vorgesehen; Produktions-Seeding legt standardmäßig keine Konten mit bekannten Passwörtern und keine Demo-Anträge an. Lokal verwenden die fiktiven Seed-Konten das nur für Entwicklung bestimmte Passwort `Falu-Dev-2026!`.
+
+Railway muss außerdem `DATABASE_URL` erhalten. Die sichere Cookie-Einstellung wird automatisch aus `NODE_ENV=production` abgeleitet und funktioniert hinter Railway HTTPS ohne fest codierte Domain. Ein verteilter Login-Rate-Limiter ist noch nicht vorhanden; vor breiter Produktionseinführung sollte er am Reverse Proxy oder in einem zentralen Store ergänzt werden. Microsoft Entra ID kann später die interne Anmeldung ersetzen, ohne die fachlichen Benutzer-, Rollen- oder Auditbeziehungen zu verändern.

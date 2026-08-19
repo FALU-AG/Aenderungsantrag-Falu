@@ -1,2 +1,4 @@
 import { expect,test } from "@playwright/test";
+import { loginAs } from "./auth-helper";
+test.beforeEach(async ({page})=>loginAs(page));
 test("öffnet die deutsche Antragserfassung",async({page})=>{await page.goto("/change-requests");await page.getByRole("link",{name:"Neuer Änderungsantrag"}).click();await expect(page).toHaveURL(/change-requests\/new/);await expect(page.getByRole("heading",{name:"Neuer Änderungsantrag"})).toBeVisible();await expect(page.getByRole("button",{name:"Als Entwurf speichern"})).toBeVisible();await expect(page.getByRole("button",{name:"Einreichen"})).toBeVisible()});

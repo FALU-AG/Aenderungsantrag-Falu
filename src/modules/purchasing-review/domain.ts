@@ -62,7 +62,7 @@ export function canEditPurchasingReview(
 ) {
   return (
     purchasingReviewAvailable(status) &&
-    (user.roles.includes("PURCHASING") || user.roles.includes("ADMINISTRATOR"))
+    (user.roles.includes("AVOR") || user.roles.includes("ADMINISTRATOR"))
   );
 }
 export function purchasingReviewState(review?: { completed: boolean } | null) {

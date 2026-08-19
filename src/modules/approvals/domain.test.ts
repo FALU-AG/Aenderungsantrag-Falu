@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { approvalAuditSummary, approvalDecisionSchema, canDecideApproval, nextApprovalCycle, resultingRequestStatus, shouldTransition } from "./domain";
-const user=(roles:("EMPLOYEE"|"AVOR"|"TECHNICAL"|"PURCHASING"|"ADMINISTRATOR")[])=>({roles});
+const user=(roles:("EMPLOYEE"|"AVOR"|"TECHNICAL"|"ADMINISTRATOR")[])=>({roles});
 describe("Freigabeworkflow",()=>{
   it("verweigert Mitarbeitenden Freigaben",()=>expect(canDecideApproval(user(["EMPLOYEE"]),"AVOR")).toBe(false));
   it("trennt AVOR- und Technikberechtigung",()=>{expect(canDecideApproval(user(["AVOR"]),"AVOR")).toBe(true);expect(canDecideApproval(user(["AVOR"]),"TECHNICAL")).toBe(false);expect(canDecideApproval(user(["TECHNICAL"]),"TECHNICAL")).toBe(true)});

@@ -1,0 +1,3 @@
+"use client";
+import { useActionState } from "react"; import { changeOwnPassword } from "@/modules/auth/actions";
+export function ChangePasswordForm(){const[state,action,pending]=useActionState(changeOwnPassword,{error:undefined} as {error?:string});return <form action={action} className="mt-5 space-y-4"><input name="password" type="password" minLength={10} required autoFocus placeholder="Neues Passwort (mind. 10 Zeichen)" className="w-full rounded-md border px-3 py-2"/>{state.error&&<p className="text-sm text-red-700">{state.error}</p>}<button disabled={pending} className="w-full rounded-md bg-[#175f91] px-4 py-2 text-white">Passwort ändern</button></form>}

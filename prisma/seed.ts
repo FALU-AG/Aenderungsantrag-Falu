@@ -1,15 +1,16 @@
 import { PrismaClient } from "@prisma/client";
+import { hash } from "bcryptjs";
 import { SAMPLE_USERS } from "../src/modules/auth/sample-users";
 import { CHANGE_REASONS, MACHINE_TYPES } from "../src/modules/reference-data";
 
 const prisma = new PrismaClient();
+const seedDemoUsers = process.env.NODE_ENV !== "production" || process.env.SEED_DEMO_USERS === "true";
 
 async function main() {
   const roleKeys = [
     "EMPLOYEE",
     "AVOR",
     "TECHNICAL",
-    "PURCHASING",
     "ADMINISTRATOR",
   ] as const;
 
@@ -22,9 +23,7 @@ async function main() {
             ? "Mitarbeitende"
             : key === "TECHNICAL"
               ? "Technik"
-              : key === "PURCHASING"
-                ? "Einkauf"
-                : key === "ADMINISTRATOR"
+              : key === "ADMINISTRATOR"
                   ? "Administration"
                   : "AVOR",
       },
@@ -35,9 +34,7 @@ async function main() {
             ? "Mitarbeitende"
             : key === "TECHNICAL"
               ? "Technik"
-              : key === "PURCHASING"
-                ? "Einkauf"
-                : key === "ADMINISTRATOR"
+              : key === "ADMINISTRATOR"
                   ? "Administration"
                   : "AVOR",
       },
@@ -47,11 +44,16 @@ async function main() {
   const roles = await prisma.role.findMany();
   const roleByKey = new Map(roles.map((role) => [role.key, role.id]));
 
-  for (const sample of SAMPLE_USERS) {
+  for (const sample of seedDemoUsers ? SAMPLE_USERS : []) {
+    const [firstName, ...lastNameParts] = sample.name.split(" ");
     await prisma.user.upsert({
       where: { email: sample.email },
       update: {
         name: sample.name,
+        firstName,
+        lastName: lastNameParts.join(" "),
+        email: sample.email.toLowerCase(),
+        passwordHash: await hash("Falu-Dev-2026!", 12),
         active: true,
         roles: {
           deleteMany: {},
@@ -63,7 +65,10 @@ async function main() {
       create: {
         id: sample.id,
         name: sample.name,
-        email: sample.email,
+        firstName,
+        lastName: lastNameParts.join(" "),
+        email: sample.email.toLowerCase(),
+        passwordHash: await hash("Falu-Dev-2026!", 12),
         active: true,
         roles: {
           create: sample.roles.map((role) => ({
@@ -99,6 +104,7 @@ async function main() {
       description: "Standardwährung",
     },
   });
+
   await prisma.appSetting.upsert({
     where: { key: "requestPrefix" },
     update: { value: "CR" },
@@ -117,6 +123,11 @@ async function main() {
       description: "Zeitzone der Benutzeroberfläche",
     },
   });
+
+  if (!seedDemoUsers) {
+    console.log("Produktions-Stammdaten aktualisiert; Demo-Benutzer und Demo-Anträge wurden ausgelassen.");
+    return;
+  }
 
   const machineRecords = await prisma.machineType.findMany();
   const reasonRecords = await prisma.changeReason.findMany({

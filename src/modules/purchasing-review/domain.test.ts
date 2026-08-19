@@ -49,14 +49,14 @@ describe("Einkaufsprüfung", () => {
     ).toBe(false);
     expect(
       canEditPurchasingReview(
-        { roles: ["PURCHASING"] },
+        { roles: ["AVOR"] },
         "PURCHASING_PROCUREMENT",
       ),
     ).toBe(true);
     expect(
       canEditPurchasingReview({ roles: ["ADMINISTRATOR"] }, "FINAL_REVIEW"),
     ).toBe(true);
-    expect(canEditPurchasingReview({ roles: ["PURCHASING"] }, "CLOSED")).toBe(
+    expect(canEditPurchasingReview({ roles: ["AVOR"] }, "CLOSED")).toBe(
       false,
     );
   });

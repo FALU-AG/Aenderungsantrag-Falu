@@ -1,0 +1,2 @@
+import { Card } from "@/components/ui/card"; import { ChangePasswordForm } from "@/components/change-password-form";
+export default function ChangePasswordPage(){return <Card className="mx-auto max-w-lg p-7"><h1 className="text-xl font-semibold">Passwort ändern</h1><p className="mt-2 text-sm text-slate-600">Legen Sie vor der weiteren Nutzung ein persönliches Passwort fest.</p><ChangePasswordForm/></Card>}

@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { loginAs, logout } from "./auth-helper";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
 const prisma = new PrismaClient({
   datasourceUrl: `${databaseUrl}${databaseUrl.includes("?") ? "&" : "?"}connection_limit=1`,
 });
 const title = "Playwright Aufgabe Phase 7";
+test.beforeEach(async ({page})=>loginAs(page));
 
 test.afterEach(async () => {
   const tasks = await prisma.task.findMany({
@@ -47,11 +49,9 @@ test("erstellt, bearbeitet und erledigt eine zugewiesene Aufgabe", async ({
     .getByRole("button", { name: "Aufgabe erstellen", exact: true })
     .click();
   await expect(page.getByRole("heading", { name: title }).first()).toBeVisible();
-  await page
-    .getByLabel("Beispielbenutzer wechseln")
-    .selectOption({ label: "Thomas Technik" });
-  await page.waitForTimeout(1_000);
-  await page.reload();
+  await logout(page);
+  await loginAs(page, "thomas.technik@example.falu.ch");
+  await page.goto("/meine-aufgaben");
   await expect(
     page.locator("header p").filter({ hasText: "Thomas Technik" }),
   ).toBeVisible();
