@@ -17,7 +17,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
-    "db:reset-admin-password": "tsx scripts/reset-admin-password.ts"
+    "db:reset-admin-password": "tsx scripts/reset-admin-password.ts",
+    "db:list-admins": "tsx scripts/list-admins.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
