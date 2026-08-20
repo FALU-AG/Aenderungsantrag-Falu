@@ -20,6 +20,7 @@
     "db:reset-admin-password": "tsx scripts/reset-admin-password.ts",
     "db:list-admins": "tsx scripts/list-admins.ts",
     "db:create-admin": "tsx scripts/create-admin.ts",
+    "db:cleanup-demo": "tsx scripts/cleanup-demo-data.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
     "storage:check": "tsx scripts/check-storage.ts"
   },

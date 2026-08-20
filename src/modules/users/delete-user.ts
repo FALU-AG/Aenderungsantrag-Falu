@@ -2,8 +2,7 @@ import { Prisma } from "@prisma/client";
 import type { AuthUser } from "@/modules/auth";
 import { db } from "@/server/db/client";
 import {
-  assertAdministratorRemains,
-  hasUserBusinessHistory,
+  assessUserDeletion,
   USER_BUSINESS_RELATION_SELECT,
   USER_HAS_BUSINESS_HISTORY_MESSAGE,
 } from "./domain";
@@ -18,8 +17,6 @@ export async function deleteUnusedUser(
   if (!actor.roles.includes("ADMINISTRATOR")) {
     throw new Error("Sie besitzen keine Berechtigung für diese Funktion.");
   }
-  if (actor.id === targetUserId) throw new Error(DELETE_SELF_MESSAGE);
-
   await client.$transaction(async (tx) => {
     const target = await tx.user.findUnique({
       where: { id: targetUserId },
@@ -36,16 +33,14 @@ export async function deleteUnusedUser(
 
     const targetRoles = target.roles.map(({ role }) => role.key);
     const targetIsActiveAdministrator = target.active && targetRoles.includes("ADMINISTRATOR");
+    let activeAdministratorCount = 2;
     if (targetIsActiveAdministrator) {
-      const activeAdministratorCount = await tx.user.count({
+      activeAdministratorCount = await tx.user.count({
         where: { active: true, roles: { some: { role: { key: "ADMINISTRATOR" } } } },
       });
-      assertAdministratorRemains(activeAdministratorCount, true, true);
     }
-
-    if (hasUserBusinessHistory(target._count)) {
-      throw new Error(USER_HAS_BUSINESS_HISTORY_MESSAGE);
-    }
+    const eligibility = assessUserDeletion({ actorId: actor.id, targetId: target.id, targetActive: target.active, targetRoles, activeAdministratorCount, counts: target._count });
+    if (!eligibility.deletable) throw new Error(eligibility.reason === "SELF" ? DELETE_SELF_MESSAGE : eligibility.reason === "BUSINESS_HISTORY" ? USER_HAS_BUSINESS_HISTORY_MESSAGE : "Es muss mindestens ein aktiver Administrator vorhanden sein.");
 
     await tx.session.deleteMany({ where: { userId: targetUserId } });
     await tx.userRole.deleteMany({ where: { userId: targetUserId } });

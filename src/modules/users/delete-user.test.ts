@@ -40,6 +40,26 @@ describe("sicheres Löschen von Benutzern", () => {
     expect(tx.auditEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "USER_DELETED", userId: "admin" }) }));
   });
 
+  it("erlaubt ein inaktives unbenutztes Konto", async () => {
+    const { client, tx } = setup({ active: false });
+    await deleteUnusedUser(actor(["ADMINISTRATOR"]), "target", client as never);
+    expect(tx.user.delete).toHaveBeenCalledOnce();
+  });
+
+  it("behandelt eine Rollenzuordnung allein nicht als Geschäftsaktivität", async () => {
+    const { client, tx } = setup({ roles: ["AVOR"] });
+    await deleteUnusedUser(actor(["ADMINISTRATOR"]), "target", client as never);
+    expect(tx.userRole.deleteMany).toHaveBeenCalledOnce();
+    expect(tx.user.delete).toHaveBeenCalledOnce();
+  });
+
+  it("behandelt eine alte Session allein nicht als Geschäftsaktivität", async () => {
+    const { client, tx } = setup();
+    await deleteUnusedUser(actor(["ADMINISTRATOR"]), "target", client as never);
+    expect(tx.session.deleteMany).toHaveBeenCalledOnce();
+    expect(tx.user.delete).toHaveBeenCalledOnce();
+  });
+
   it.each<RoleKey>(["EMPLOYEE", "AVOR", "TECHNICAL"])("verweigert die Löschung für %s", async (role) => {
     const { client } = setup();
     await expect(deleteUnusedUser(actor([role]), "target", client as never)).rejects.toThrow("Sie besitzen keine Berechtigung");
