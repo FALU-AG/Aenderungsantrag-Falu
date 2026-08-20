@@ -108,9 +108,14 @@ export function creatorAndApplicant(
   applicantName: string,
 ) {
   return {
+    // applicantId is the immutable authenticated creator relation; applicantName is editable business data.
     applicantId: authenticatedUserId,
     applicantName: applicantName.trim(),
   };
+}
+
+export function editableApplicant(applicantName: string) {
+  return { applicantName: applicantName.trim() };
 }
 
 export function formDataToInput(formData: FormData): ChangeRequestInput {

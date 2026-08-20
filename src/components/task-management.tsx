@@ -161,12 +161,14 @@ function CreateTaskForm({
           label="Titel"
           required
           error={state.errors?.title?.[0]}
+          placeholder="z. B. Fertigungszeichnung aktualisieren"
         />
         <AssistedTextField
           name="description"
           label="Beschreibung"
           multiline
           rows={4}
+          placeholder="z. B. Zeichnung anpassen und zur Freigabe bereitstellen."
         />
         <Fields users={users} />
         {state.message && (

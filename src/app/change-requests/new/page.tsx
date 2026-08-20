@@ -24,6 +24,7 @@ export default async function NewRequestPage() {
         description="Erfassen Sie die Änderung und speichern Sie sie als Entwurf oder reichen Sie sie direkt ein."
       />
       <ChangeRequestForm
+        defaultApplicantName={user.name}
         machineTypes={machines.map((m) => ({ id: m.id, label: m.code }))}
         reasons={reasons.map((r) => ({
           id: r.id,

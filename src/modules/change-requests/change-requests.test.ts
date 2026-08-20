@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { generateChangeRequestNumber } from "./numbering";
-import { creatorAndApplicant, submissionSchema } from "./validation";
+import { creatorAndApplicant, editableApplicant, formDataToInput, submissionSchema } from "./validation";
 import { canEditDraft } from "./authorization";
 import { submissionData } from "./submission";
 import { buildRequestListQuery } from "./list-query";
@@ -118,5 +118,23 @@ describe("Antragsaufnahme", () => {
     expect(result.page).toBe(2);
     expect(result.where).toMatchObject({ status: "DRAFT" });
     expect(result.orderBy).toEqual({ title: "asc" });
+  });
+  it("ändert beim Bearbeiten nur den Antragstellernamen, nicht den Ersteller", () => {
+    expect(editableApplicant(" Marc Wyss ")).toEqual({ applicantName: "Marc Wyss" });
+    expect(editableApplicant("Marc Wyss")).not.toHaveProperty("applicantId");
+  });
+  it("übernimmt Platzhaltertexte nicht als Formulardaten", () => {
+    const form = new FormData();
+    expect(formDataToInput(form).title).toBe("");
+    expect(formDataToInput(form).applicantName).toBe("");
+  });
+  it("filtert Abgeschlossen ausschliesslich auf CLOSED", () => {
+    expect(buildRequestListQuery({ view: "closed" }).where).toMatchObject({ status: "CLOSED" });
+  });
+  it("definiert Offen als alle nicht abgeschlossenen Anträge", () => {
+    expect(buildRequestListQuery({ view: "open" }).where).toMatchObject({ status: { not: "CLOSED" } });
+  });
+  it("verwendet für Meine die bestehende Erstellerzuordnung", () => {
+    expect(buildRequestListQuery({ view: "mine" }, "user-1").where).toMatchObject({ applicantId: "user-1" });
   });
 });

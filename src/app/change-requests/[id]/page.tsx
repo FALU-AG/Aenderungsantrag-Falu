@@ -5,6 +5,7 @@ import { Paperclip, Pencil } from "lucide-react";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
 import { StatusBadge } from "@/components/status-badge";
+import { RequestIdentity } from "@/components/request-identity";
 import { Card } from "@/components/ui/card";
 import { ApprovalCard } from "@/components/approval-card";
 import { TechnicalReviewForm } from "@/components/technical-review-form";
@@ -159,7 +160,7 @@ export default async function RequestDetailPage({
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {request.machineType?.code ?? "Kein Maschinentyp"} ·{" "}
-            {request.applicantName || request.applicant.name} · Aktualisiert{" "}
+            Antragsteller: {request.applicantName || "–"} · Aktualisiert{" "}
             {formatDate(request.updatedAt)}
           </p>
         </div>
@@ -793,6 +794,9 @@ function Overview({
 }: {
   request: {
     status: string;
+    applicant: { name: string };
+    applicantName: string;
+    createdAt: Date;
     articleNumber: string | null;
     articleDescription: string | null;
     description: string;
@@ -838,6 +842,7 @@ function Overview({
       <Card className="p-6">
         <h2 className="font-semibold">Antragsdetails</h2>
         <dl className="mt-5 grid gap-5 md:grid-cols-2">
+          <RequestIdentity creatorName={request.applicant.name} applicantName={request.applicantName} createdAt={formatDate(request.createdAt)} />
           <Item l="Artikel-/Baugruppennummer" v={request.articleNumber} />
           <Item
             l="Artikel-/Baugruppenbezeichnung"

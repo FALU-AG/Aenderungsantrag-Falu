@@ -106,6 +106,7 @@ export function PurchasingReviewForm({
                 value={review?.supplier}
                 disabled={locked}
                 error={error("supplier")}
+                placeholder="z. B. Festo AG"
               />
               <AssistedTextField
                 name="supplierNotes"
@@ -139,6 +140,7 @@ export function PurchasingReviewForm({
                       label="Bestellnummer (optional)"
                       value={review?.orderNumber}
                       disabled={locked}
+                      placeholder="z. B. PO-2026-1842"
                     />
                     <Input
                       name="orderDate"
@@ -299,6 +301,7 @@ function Input({
   disabled,
   error,
   type = "text",
+  placeholder,
 }: {
   name: string;
   label: string;
@@ -306,6 +309,7 @@ function Input({
   disabled: boolean;
   error?: string;
   type?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="block">
@@ -315,6 +319,7 @@ function Input({
         type={type}
         defaultValue={value ?? ""}
         disabled={disabled}
+        placeholder={placeholder}
         className="mt-2 w-full rounded-md border px-3 py-2.5 text-sm disabled:bg-slate-50"
       />
       <Error text={error} />

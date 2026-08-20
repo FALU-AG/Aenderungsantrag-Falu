@@ -8,28 +8,17 @@ describe("Seed-Annahmen", () => {
     expect(new Set(SAMPLE_USERS.map((user) => user.email)).size).toBe(5);
   });
 
-  it("enthält alle geforderten Maschinentypen", () => {
-    expect(MACHINE_TYPES.map((item) => item.code)).toEqual(
-      expect.arrayContaining([
-        "CB1",
-        "CT",
-        "CS-2500",
-        "PRX",
-        "SV-2X",
-        "ABS",
-        "BL-8",
-        "BL-12",
-        "BL-16",
-        "BLS-12",
-        "BV-2A",
-        "BV-2M",
-        "RB-30A",
-        "SQB-2A",
-        "SQB-AT",
-        "SV2-S",
-        "WV",
-      ]),
-    );
+  it("stellt nur die korrigierten Maschinentypen für neue Anträge bereit", () => {
+    const active = MACHINE_TYPES.filter((item) => item.active).map((item) => item.code);
+    expect(active).toContain("SQB-2AT");
+    expect(active).not.toEqual(expect.arrayContaining(["BLS-12", "SQB-2A", "SQB-AT", "SQT-AT"]));
+    expect(MACHINE_TYPES.find((item) => item.code === "SQB-AT")?.active).toBe(false);
+    expect(MACHINE_TYPES.find((item) => item.code === "SQT-AT")?.active).toBe(false);
+    expect(MACHINE_TYPES.filter((item) => ["BLS-12", "SQB-2A", "SQB-AT", "SQT-AT"].includes(item.code)).every((item) => !item.active)).toBe(true);
+  });
+
+  it("behält alte Maschinentypen inaktiv für historische Referenzen", () => {
+    expect(MACHINE_TYPES.find((item) => item.code === "BLS-12")).toMatchObject({ active: false });
   });
 
   it("enthält elf deutsche Änderungsgründe mit Sonstiges", () => {

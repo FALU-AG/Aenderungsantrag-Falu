@@ -5,6 +5,7 @@ import { PageHeading } from "@/components/page-heading";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { buildRequestListQuery } from "@/modules/change-requests/list-query";
+import { getCurrentUser } from "@/modules/auth";
 import {
   CHANGE_REQUEST_STATUSES,
   STATUS_LABELS,
@@ -15,7 +16,8 @@ export default async function RequestsPage({
   searchParams,
 }: PageProps<"/change-requests">) {
   const params = await searchParams;
-  const { where, orderBy, page } = buildRequestListQuery(params);
+  const currentUser = await getCurrentUser();
+  const { where, orderBy, page } = buildRequestListQuery(params, currentUser.id);
   const [rows, total, machines, reasons, users] = await Promise.all([
     db.changeRequest.findMany({
       where,
@@ -46,6 +48,12 @@ export default async function RequestsPage({
         title="Änderungsanträge"
         description={`${total} Änderungsanträge gefunden.`}
       />
+      <nav aria-label="Schnellfilter" className="mb-4 flex flex-wrap gap-2">
+        {[["", "Alle"], ["open", "Offen"], ["mine", "Meine"], ["closed", "Abgeschlossen"]].map(([view, label]) => {
+          const active = (typeof params.view === "string" ? params.view : "") === view;
+          return <Link key={label} href={view ? `/change-requests?view=${view}` : "/change-requests"} className={`rounded-full border px-4 py-2 text-sm font-semibold ${active ? "border-[#175f91] bg-[#175f91] text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</Link>;
+        })}
+      </nav>
       <Card className="mb-5 p-4">
         <Form
           action="/change-requests"

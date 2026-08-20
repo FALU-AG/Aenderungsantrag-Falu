@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/modules/auth";
 import { requirePermission } from "@/modules/authorization/permissions";
 import {
   creatorAndApplicant,
+  editableApplicant,
   formDataToInput,
   draftSchema,
   submissionSchema,
@@ -73,7 +74,7 @@ export async function saveChangeRequest(
         where: { id, version: parsed.data.version, status: existing.status },
         data: {
           title: parsed.data.title,
-          applicantName: parsed.data.applicantName,
+          ...editableApplicant(parsed.data.applicantName),
           machineTypeId: parsed.data.machineTypeId || null,
           articleNumber: parsed.data.articleNumber || null,
           articleDescription: parsed.data.articleDescription || null,

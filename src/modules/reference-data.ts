@@ -1,4 +1,4 @@
-export const MACHINE_TYPES = [
+const ACTIVE_MACHINE_TYPES = [
   "CB1",
   "CT",
   "CS-2500",
@@ -8,15 +8,17 @@ export const MACHINE_TYPES = [
   "BL-8",
   "BL-12",
   "BL-16",
-  "BLS-12",
   "BV-2A",
   "BV-2M",
   "RB-30A",
-  "SQB-2A",
-  "SQB-AT",
+  "SQB-2AT",
   "SV2-S",
   "WV",
 ].map((code) => ({ code, name: code, active: true }));
+
+const INACTIVE_MACHINE_TYPES = ["BLS-12", "SQB-2A", "SQB-AT", "SQT-AT"].map((code) => ({ code, name: code, active: false }));
+
+export const MACHINE_TYPES = [...ACTIVE_MACHINE_TYPES, ...INACTIVE_MACHINE_TYPES];
 
 export const CHANGE_REASONS = [
   "Änderung eines Teils oder einer Baugruppe an einer bestehenden Maschine",

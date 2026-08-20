@@ -29,6 +29,7 @@ type Values = {
 type Props = {
   machineTypes: { id: string; label: string }[];
   reasons: Option[];
+  defaultApplicantName?: string;
   initial?: Values & {
     id: string;
     version: number;
@@ -38,14 +39,14 @@ type Props = {
 };
 const initialState: FormState = {};
 
-export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
+export function ChangeRequestForm({ machineTypes, reasons, initial, defaultApplicantName = "" }: Props) {
   const [state, action, pending] = useActionState(
     saveChangeRequest,
     initialState,
   );
   const { register, control } = useForm<Values>({
     defaultValues: initial ?? {
-      applicantName: "",
+      applicantName: defaultApplicantName,
       title: "",
       machineTypeId: "",
       articleNumber: "",
@@ -71,7 +72,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
   const showOther = other && selected.includes(other.id);
   const error = (field: string) => state.errors?.[field]?.[0];
   const input =
-    "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100";
+    "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100";
   return (
     <form action={action} className="space-y-5">
       {initial && (
@@ -91,7 +92,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
           {initial && <ReadOnly label="Nummer" value={initial.number} />}
           <label>
             <span className="text-sm font-medium">Antragsteller *</span>
-            <input {...register("applicantName")} className={input} />
+            <input {...register("applicantName")} placeholder="z. B. Marc Wyss" className={input} />
             <Error text={error("applicantName")} />
           </label>
           <ReadOnly
@@ -110,6 +111,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
               error={error("title")}
               maxLength={200}
               context={writingContext}
+              placeholder="z. B. Riemenspanner hält Spannung nicht"
             />
           </div>
           <label>
@@ -133,18 +135,14 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
             <span className="text-sm font-medium">
               Artikel-/Baugruppennummer *
             </span>
-            <input {...register("articleNumber")} className={input} />
+            <input {...register("articleNumber")} placeholder="z. B. 116-2458" className={input} />
             <Error text={error("articleNumber")} />
           </label>
-          <AssistedTextField
-            name="articleDescription"
-            label="Artikel-/Baugruppenbezeichnung"
-            defaultValue={initial?.articleDescription}
-            required
-            error={error("articleDescription")}
-            maxLength={300}
-            context={writingContext}
-          />
+          <label>
+            <span className="text-sm font-medium">Artikel-/Baugruppenbezeichnung *</span>
+            <input {...register("articleDescription")} required maxLength={300} placeholder="z. B. Halteplatte Riemenspanner" className={input} />
+            <Error text={error("articleDescription")} />
+          </label>
         </div>
       </Card>
       <Card className="p-6">
@@ -190,6 +188,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
               required
               error={error("otherReasonText")}
               maxLength={500}
+              placeholder="z. B. Anforderung aus einem Serviceeinsatz"
             />
           </div>
         )}
@@ -207,6 +206,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial }: Props) {
             error={error("description")}
             maxLength={10000}
             context={writingContext}
+            placeholder="z. B. Der Riemen verliert nach kurzer Laufzeit die erforderliche Spannung."
           />
         </div>
       </Card>

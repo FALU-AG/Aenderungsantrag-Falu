@@ -13,7 +13,7 @@ export default async function EditRequestPage({
   const [request, machines, reasons] = await Promise.all([
     db.changeRequest.findUnique({ where: { id }, include: { reasons: true } }),
     db.machineType.findMany({
-      where: { active: true },
+      where: { OR: [{ active: true }, { requests: { some: { id } } }] },
       orderBy: { code: "asc" },
     }),
     db.changeReason.findMany({

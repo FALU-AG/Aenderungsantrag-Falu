@@ -19,6 +19,7 @@ type Props = {
   error?: string;
   maxLength?: number;
   context?: string;
+  placeholder?: string;
 };
 
 export function AssistedTextField({
@@ -32,6 +33,7 @@ export function AssistedTextField({
   error,
   maxLength,
   context,
+  placeholder,
 }: Props) {
   const [value, setValue] = useState(defaultValue ?? "");
   const [preview, setPreview] = useState<string>();
@@ -96,7 +98,7 @@ export function AssistedTextField({
   }
 
   const fieldClass =
-    "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50";
+    "mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50";
   const common = {
     name,
     value,
@@ -107,6 +109,7 @@ export function AssistedTextField({
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => setValue(event.target.value),
     className: fieldClass,
+    placeholder,
   };
 
   return (
