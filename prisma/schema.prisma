@@ -61,6 +61,11 @@ enum TaskStatus {
   DONE
 }
 
+enum StorageProvider {
+  LOCAL
+  SUPABASE
+}
+
 model User {
   id                   String             @id @default(cuid())
   name                 String
@@ -338,6 +343,7 @@ model Attachment {
   changeRequestId String
   originalName    String
   storageKey      String        @unique
+  storageProvider StorageProvider @default(LOCAL)
   mimeType        String
   sizeBytes       Int
   category        String?

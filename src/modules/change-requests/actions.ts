@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
 import { requirePermission } from "@/modules/authorization/permissions";
@@ -13,10 +14,7 @@ import {
 } from "./validation";
 import { generateChangeRequestNumber } from "./numbering";
 import { requireDraftEdit } from "./authorization";
-import {
-  removeAttachmentFile,
-  storeAttachment,
-} from "@/server/storage/local-storage";
+import { cleanupUploadedAttachment, removeStoredAttachment, supabaseObjectKey, uploadNewAttachment } from "@/server/storage/attachment-storage";
 import { submissionData } from "./submission";
 
 export type FormState = { errors?: Record<string, string[]>; message?: string };
@@ -235,13 +233,17 @@ async function uploadAttachmentForRequest(
   userId: string,
   file: File,
 ) {
-  const key = await storeAttachment(file);
-  await db.$transaction(async (tx) => {
+  const attachmentId = randomUUID();
+  const key = supabaseObjectKey(requestId, attachmentId, file.name);
+  await uploadNewAttachment(file, key);
+  try { await db.$transaction(async (tx) => {
     const attachment = await tx.attachment.create({
       data: {
+        id: attachmentId,
         changeRequestId: requestId,
         originalName: file.name,
         storageKey: key,
+        storageProvider: "SUPABASE",
         mimeType: file.type,
         sizeBytes: file.size,
         uploadedById: userId,
@@ -258,7 +260,7 @@ async function uploadAttachmentForRequest(
         details: { sizeBytes: file.size, mimeType: file.type },
       },
     });
-  });
+  }); } catch (error) { await cleanupUploadedAttachment(key); throw error; }
 }
 
 export async function uploadAttachment(requestId: string, formData: FormData) {
@@ -283,6 +285,7 @@ export async function removeAttachment(attachmentId: string) {
     },
   });
   requireDraftEdit(user, attachment.changeRequest);
+  await removeStoredAttachment(attachment.storageProvider, attachment.storageKey);
   await db.$transaction(async (tx) => {
     await tx.attachment.update({
       where: { id: attachmentId },
@@ -299,7 +302,6 @@ export async function removeAttachment(attachmentId: string) {
       },
     });
   });
-  await removeAttachmentFile(attachment.storageKey);
   revalidatePath(`/change-requests/${attachment.changeRequest.id}`);
 }
 

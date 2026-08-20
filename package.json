@@ -18,7 +18,10 @@
     "db:seed": "prisma db seed",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "db:reset-admin-password": "tsx scripts/reset-admin-password.ts",
-    "db:list-admins": "tsx scripts/list-admins.ts"
+    "db:list-admins": "tsx scripts/list-admins.ts",
+    "db:create-admin": "tsx scripts/create-admin.ts",
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "storage:check": "tsx scripts/check-storage.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -29,6 +32,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.8.0",
     "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.112.3",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

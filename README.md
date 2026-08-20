@@ -88,7 +88,29 @@ Der aktuelle `SampleIdentityProvider` verwendet ein HTTP-only Cookie und feste B
 
 Geschäftsmutationen sollen `withAudit` verwenden. Dadurch werden Datenänderung und Audit-Eintrag in derselben Datenbanktransaktion gespeichert. Eingereichte und abgeschlossene Datensätze werden in späteren Phasen nur archiviert beziehungsweise gesperrt, niemals hart gelöscht.
 
-Anhänge werden im Prototyp künftig unter `storage/` abgelegt; der Ordner ist von Git ausgeschlossen. Metadaten liegen in PostgreSQL.
+## Persistente Anhänge mit Supabase Storage
+
+Neue Anhänge werden im privaten Supabase-Bucket `change-request-attachments` gespeichert. PostgreSQL enthält weiterhin nur Metadaten und den Objektpfad; Downloads laufen ausschließlich über die authentifizierte Anwendungsroute. Der Service-Role-Key bleibt serverseitig und darf niemals als `NEXT_PUBLIC_`-Variable konfiguriert werden.
+
+```env
+DATABASE_URL="postgresql://..." # Prisma/PostgreSQL
+SUPABASE_URL="https://PROJECT.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="..." # nur serverseitig
+```
+
+Den privaten Bucket einmalig und idempotent einrichten:
+
+```bash
+npm run storage:setup
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` akzeptiert aus Kompatibilitätsgründen sowohl aktuelle Supabase Secret API Keys (`sb_secret_...`) als auch den bisherigen `service_role`-JWT. Der Wert wird nicht als JWT geparst und niemals an den Browser ausgeliefert. Vor dem Setup kann die Verbindung rein lesend diagnostiziert werden:
+
+```bash
+npm run storage:check
+```
+
+In Railway werden `DATABASE_URL`, `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY` benötigt. Ein Railway Volume ist nicht erforderlich. Historische Datensätze mit Provider `LOCAL` bleiben lokal lesbar, solange die Datei existiert; ist sie in einer Produktionsinstanz nicht vorhanden, zeigt die Downloadroute `Anhang ist nicht mehr verfügbar.` Eine automatische oder destruktive Migration bestehender Dateien findet nicht statt.
 
 ## Phase-2-Routen
 

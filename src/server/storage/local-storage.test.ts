@@ -17,4 +17,6 @@ describe("Foto-Anhänge", () => {
       ),
     ).toThrow("Dateityp nicht erlaubt");
   });
+  it("weist Dateien über 20 MB ab",()=>expect(()=>validateAttachment(new File([new Uint8Array(20*1024*1024+1)],"gross.pdf",{type:"application/pdf"}))).toThrow("20 MB"));
+  it("akzeptiert alle unterstützten Dokumenttypen",()=>{for(const type of ["application/pdf","image/png","image/jpeg","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"])expect(()=>validateAttachment(new File(["x"],"datei",{type}))).not.toThrow();});
 });

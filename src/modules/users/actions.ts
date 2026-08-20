@@ -5,10 +5,13 @@ import { requireRole, type RoleKey } from "@/modules/auth";
 import { hashPassword, passwordError, validatePassword } from "@/modules/auth/password";
 import { invalidateUserSessions } from "@/modules/auth/session";
 import { db } from "@/server/db/client";
-import { assertAdministratorRemains, normalizeEmail, selectableRoles } from "./domain";
+import { assertAdministratorRemains, normalizeEmail, normalizeRoles, selectableRoles } from "./domain";
+import { deleteUnusedUser } from "./delete-user";
+
+export type DeleteUserActionState = { error?: string; success?: boolean };
 
 function values(form: FormData) {
-  const roles = form.getAll("roles").map(String).filter((role): role is RoleKey => selectableRoles.includes(role as RoleKey));
+  const roles = normalizeRoles(form.getAll("roles").map(String).filter((role): role is RoleKey => selectableRoles.includes(role as RoleKey)));
   return { firstName: String(form.get("firstName") ?? "").trim(), lastName: String(form.get("lastName") ?? "").trim(), email: normalizeEmail(String(form.get("email") ?? "")), roles, active: form.get("active") === "on" };
 }
 async function roleIds(keys: readonly RoleKey[]) {
@@ -47,4 +50,16 @@ export async function resetPassword(userId: string, form: FormData) {
   await invalidateUserSessions(userId);
   await db.auditEvent.create({ data: { userId: actor.id, action: "USER_PASSWORD_RESET", entityType: "User", entityId: userId, summary: `Das Passwort von ${target.name} wurde durch einen Administrator zurückgesetzt.` } });
   revalidatePath("/admin/users");
+}
+
+export async function deleteUser(userId: string, _state: DeleteUserActionState): Promise<DeleteUserActionState> {
+  void _state;
+  try {
+    const actor = await requireRole("ADMINISTRATOR");
+    await deleteUnusedUser(actor, userId);
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Der Benutzer konnte nicht gelöscht werden." };
+  }
 }

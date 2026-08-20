@@ -5,6 +5,7 @@ import type { AuthUser } from "@/modules/auth";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { CreateChangeRequestCta } from "./create-change-request-cta";
 import { logout } from "@/modules/auth/actions";
+import { roleSummary } from "@/modules/users/domain";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: Gauge },
@@ -46,7 +47,7 @@ export function AppShell({
                 canCreate={hasPermission(user, "CHANGE_REQUEST_CREATE")}
               />
             </Suspense>
-            <div className="hidden text-right sm:block"><p className="text-sm font-semibold text-slate-900">{user.name}</p><p className="text-xs text-slate-500">{user.roles.map((role) => ({EMPLOYEE:"Mitarbeiter",AVOR:"AVOR",TECHNICAL:"Technik",ADMINISTRATOR:"Administrator"}[role])).join(", ")}</p></div>
+            <div className="hidden text-right sm:block"><p className="text-sm font-semibold text-slate-900">{user.name}</p><p className="text-xs text-slate-500">{roleSummary(user.roles)}</p></div>
             <form action={logout}><button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#175f91] focus:ring-offset-2">Abmelden</button></form>
           </div>
         </div>
