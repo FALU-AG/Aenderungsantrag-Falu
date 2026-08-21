@@ -222,6 +222,7 @@ function TaskCard({
     editable = !locked && (full || responsible);
   return (
     <Card
+      id={`task-${task.id}`}
       className={`p-5 ${task.overdue ? "border-red-300 bg-red-50/40" : ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

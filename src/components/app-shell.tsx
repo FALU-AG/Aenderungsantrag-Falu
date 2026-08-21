@@ -7,6 +7,7 @@ import { CreateChangeRequestCta } from "./create-change-request-cta";
 import { LiveDateTime } from "./live-date-time";
 import { logout } from "@/modules/auth/actions";
 import { roleSummary } from "@/modules/users/domain";
+import { loadPersonalInbox } from "@/modules/inbox/query";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: Gauge },
@@ -14,13 +15,14 @@ const navigation = [
   { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: ListTodo },
 ];
 
-export function AppShell({
+export async function AppShell({
   user,
   children,
 }: {
   user: AuthUser;
   children: React.ReactNode;
 }) {
+  const inboxCount = (await loadPersonalInbox(user)).length;
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
@@ -68,6 +70,11 @@ export function AppShell({
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {label}
+                {href === "/meine-aufgaben" && inboxCount > 0 && (
+                  <span className="ml-auto rounded-full bg-[#175f91] px-2 py-0.5 text-xs font-semibold text-white">
+                    {inboxCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
