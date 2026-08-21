@@ -363,7 +363,7 @@ function Modal({
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-lg rounded-lg bg-white p-6"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-4 sm:p-6"
       >
         <div className="flex justify-between gap-3">
           <h2 className="text-lg font-semibold">{title}</h2>

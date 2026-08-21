@@ -86,7 +86,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           {state.message}
         </div>
       )}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold text-slate-950">Allgemein</h2>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           {initial && <ReadOnly label="Nummer" value={initial.number} />}
@@ -128,7 +128,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           </label>
         </div>
       </Card>
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold">Artikel / Baugruppe</h2>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <label>
@@ -145,7 +145,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           </label>
         </div>
       </Card>
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold">Änderungsgrund *</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {reasons.map((reason) => (
@@ -193,7 +193,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           </div>
         )}
       </Card>
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold">Beschreibung</h2>
         <div className="mt-4">
           <AssistedTextField
@@ -210,20 +210,20 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           />
         </div>
       </Card>
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h2 className="font-semibold">Anhänge</h2>
         <p className="mb-4 mt-1 text-sm text-slate-500">
           PDF, PNG, JPG, DOCX oder XLSX; maximal 20 MB pro Datei.
         </p>
         <AttachmentPicker />
       </Card>
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button
           type="submit"
           name="intent"
           value="draft"
           disabled={pending}
-          className="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+          className="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
         >
           Als Entwurf speichern
         </button>
@@ -232,7 +232,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           name="intent"
           value="submit"
           disabled={pending}
-          className="rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#124d76] disabled:opacity-50"
+          className="min-h-11 rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#124d76] disabled:opacity-50"
         >
           Einreichen
         </button>

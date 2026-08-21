@@ -106,7 +106,7 @@ export default async function RequestsPage({
         </Form>
       </Card>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
@@ -170,8 +170,9 @@ export default async function RequestsPage({
             </tbody>
           </table>
         </div>
+        <div className="divide-y divide-slate-100 md:hidden">{rows.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block p-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-semibold text-slate-900">{r.title||"Unbenannter Entwurf"}</p><dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-slate-500">Maschinentyp</dt><dd>{r.machineType?.code??"–"}</dd></div><div><dt className="text-xs text-slate-500">Antragsteller</dt><dd>{r.applicantName||r.applicant.name}</dd></div><div className="col-span-2"><dt className="text-xs text-slate-500">Änderungsgrund</dt><dd>{r.reasons.map((x)=>x.changeReason.label).join(", ")||"–"}</dd></div></dl></Link>)}{!rows.length&&<p className="p-8 text-center text-sm text-slate-500">Keine Änderungsanträge gefunden.</p>}</div>
       </Card>
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
         <Link
           aria-disabled={page <= 1}
           href={`?page=${page - 1}`}

@@ -15,7 +15,7 @@ export function DeleteUserAction({ userId, userName }: { userId: string; userNam
       </button>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby={`delete-user-${userId}`} aria-describedby={`delete-user-description-${userId}`} className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+          <div role="dialog" aria-modal="true" aria-labelledby={`delete-user-${userId}`} aria-describedby={`delete-user-description-${userId}`} className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6">
             <h2 id={`delete-user-${userId}`} className="text-lg font-semibold">Benutzer endgültig löschen?</h2>
             <p className="mt-3 text-sm text-slate-600" id={`delete-user-description-${userId}`}>Dieser Benutzer wird dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.</p>
             <p className="mt-2 text-sm font-medium text-slate-800">{userName}</p>

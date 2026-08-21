@@ -66,13 +66,13 @@ export default async function DashboardPage() {
         title="Dashboard"
         description="Überblick über Änderungsanträge, Freigaben und offene Arbeiten."
       />
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-3 min-[480px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 2xl:gap-4">
         {kpis.map(({ label, value, icon: Icon }) => (
-          <Card key={label} className="p-5">
+          <Card key={label} className="p-4 sm:p-5">
             <div className="flex justify-between">
               <div>
                 <p className="text-sm text-slate-600">{label}</p>
-                <p className="mt-3 text-3xl font-bold">{value}</p>
+                <p className="mt-2 text-2xl font-bold sm:mt-3 sm:text-3xl">{value}</p>
               </div>
               <span className="h-fit rounded-md bg-slate-100 p-2 text-[#175f91]">
                 <Icon className="size-5" />
@@ -81,13 +81,13 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </section>
-      <Card className="mt-7 overflow-hidden">
+      <Card className="mt-5 overflow-hidden sm:mt-7">
         <div className="border-b px-5 py-4">
           <h2 className="font-semibold">
             Zuletzt aktualisierte Änderungsanträge
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
@@ -120,6 +120,7 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         </div>
+        <div className="divide-y divide-slate-100 md:hidden">{recent.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block px-4 py-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-medium text-slate-900">{r.title||"Unbenannter Entwurf"}</p><p className="mt-1 text-sm text-slate-500">Maschinentyp: {r.machineType?.code??"–"}</p></Link>)}</div>
       </Card>
     </>
   );

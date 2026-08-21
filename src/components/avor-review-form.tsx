@@ -237,7 +237,7 @@ export function AvorReviewForm({
           <div
             role="dialog"
             aria-modal="true"
-            className="w-full max-w-md rounded-lg bg-white p-6"
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 sm:p-6"
           >
             <h2 className="text-lg font-semibold">
               AVOR-Prüfung erneut öffnen
