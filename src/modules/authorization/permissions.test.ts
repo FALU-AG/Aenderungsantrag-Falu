@@ -12,11 +12,14 @@ describe("Berechtigungen", () => {
   it("gewährt Mitarbeitern die Basisberechtigungen", () => {
     expect(hasPermission({ roles: ["EMPLOYEE"] }, "CHANGE_REQUEST_CREATE")).toBe(true);
     expect(hasPermission({ roles: ["EMPLOYEE"] }, "TASK_UPDATE")).toBe(true);
+    expect(hasPermission({ roles: ["EMPLOYEE"] }, "TASK_CREATE")).toBe(false);
   });
 
   it("vererbt AVOR und Technik die Basisberechtigungen ohne Mitarbeiterrolle", () => {
     expect(hasPermission({ roles: ["AVOR"] }, "CHANGE_REQUEST_CREATE")).toBe(true);
     expect(hasPermission({ roles: ["TECHNICAL"] }, "CHANGE_REQUEST_CREATE")).toBe(true);
+    expect(hasPermission({ roles: ["AVOR"] }, "TASK_CREATE")).toBe(true);
+    expect(hasPermission({ roles: ["TECHNICAL"] }, "TASK_CREATE")).toBe(true);
   });
 
   it("behandelt redundante Mitarbeiterrollen berechtigungsseitig identisch", () => {

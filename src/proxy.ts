@@ -5,4 +5,4 @@ export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname !== "/login" && !request.cookies.has(SESSION_COOKIE)) return NextResponse.redirect(new URL("/login", request.url));
   return NextResponse.next({ request: { headers } });
 }
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|icon.svg).*)"] };

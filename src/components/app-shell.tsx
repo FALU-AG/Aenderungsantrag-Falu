@@ -4,6 +4,7 @@ import { ClipboardList, Gauge, ListTodo, Settings } from "lucide-react";
 import type { AuthUser } from "@/modules/auth";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { CreateChangeRequestCta } from "./create-change-request-cta";
+import { LiveDateTime } from "./live-date-time";
 import { logout } from "@/modules/auth/actions";
 import { roleSummary } from "@/modules/users/domain";
 
@@ -42,6 +43,7 @@ export function AppShell({
             </span>
           </Link>
           <div className="flex min-w-0 items-center gap-3">
+            <LiveDateTime />
             <Suspense fallback={null}>
               <CreateChangeRequestCta
                 canCreate={hasPermission(user, "CHANGE_REQUEST_CREATE")}

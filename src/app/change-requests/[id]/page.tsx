@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Paperclip, Pencil } from "lucide-react";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
+import { hasPermission } from "@/modules/authorization/permissions";
 import { StatusBadge } from "@/components/status-badge";
 import { RequestIdentity } from "@/components/request-identity";
 import { Card } from "@/components/ui/card";
@@ -134,6 +135,13 @@ export default async function RequestDetailPage({
   const current = request.approvals.filter(
     (a) => a.cycle === request.approvalCycle,
   );
+  const technicalApprovalStatus = current.find(
+    (approval) => approval.type === "TECHNICAL",
+  )?.status;
+  const technicalGate = {
+    status: request.status,
+    technicalApprovalStatus,
+  };
   const previousCycles = [
     ...new Set(
       request.approvals
@@ -238,8 +246,8 @@ export default async function RequestDetailPage({
                 }
               : null
           }
-          editable={canEditTechnicalReview(user, request.status)}
-          available={technicalReviewAvailable(request.status)}
+          editable={canEditTechnicalReview(user, technicalGate)}
+          available={technicalReviewAvailable(technicalGate)}
         />
       ) : tab === "AVOR" ? (
         <AvorReviewForm
@@ -290,6 +298,7 @@ export default async function RequestDetailPage({
           users={activeUsers}
           currentUserId={user.id}
           isAdmin={user.roles.includes("ADMINISTRATOR")}
+          canCreateAndAssign={hasPermission(user, "TASK_CREATE")}
           readOnly={request.status === "CLOSED"}
           tasks={sortTasks(
             request.tasks.map((task) => ({

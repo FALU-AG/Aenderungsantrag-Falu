@@ -14,6 +14,10 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Falu Change Request",
   description: "Interne Änderungsanträge der Falu AG",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+  },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

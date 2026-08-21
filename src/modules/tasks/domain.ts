@@ -64,12 +64,24 @@ export type TaskPermissionRecord = {
   status: TaskStatusKey;
 };
 const admin = (u: Pick<AuthUser, "roles">) => u.roles.includes("ADMINISTRATOR");
+export function canCreateAndAssignTasks(user: Pick<AuthUser, "roles">) {
+  return user.roles.some((role) =>
+    (["AVOR", "TECHNICAL", "ADMINISTRATOR"] as const).includes(
+      role as "AVOR" | "TECHNICAL" | "ADMINISTRATOR",
+    ),
+  );
+}
+export function taskWorkAvailable(requestStatus: string) {
+  return requestStatus !== "CLOSED";
+}
 export function taskAccess(
   user: Pick<AuthUser, "id" | "roles">,
   task: TaskPermissionRecord,
 ) {
   return {
-    full: admin(user) || task.createdById === user.id,
+    full:
+      admin(user) ||
+      (task.createdById === user.id && canCreateAndAssignTasks(user)),
     responsible: task.responsibleUserId === user.id,
     canComplete:
       admin(user) ||

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignedTaskWhere,
+  canCreateAndAssignTasks,
   completionMetadata,
   isTaskOverdue,
   sortTasks,
@@ -8,6 +9,7 @@ import {
   taskAudit,
   taskSchema,
   taskSummary,
+  taskWorkAvailable,
   overdueTaskWhere,
 } from "./domain";
 const base = {
@@ -43,6 +45,25 @@ describe("Aufgaben", () => {
     expect(taskAccess({ id: "u3", roles: ["ADMINISTRATOR"] }, task).full).toBe(
       true,
     );
+  });
+  it("beschränkt Erstellen und Zuweisen auf AVOR, Technik und Administration", () => {
+    expect(canCreateAndAssignTasks({ roles: ["EMPLOYEE"] })).toBe(false);
+    expect(canCreateAndAssignTasks({ roles: ["AVOR"] })).toBe(true);
+    expect(canCreateAndAssignTasks({ roles: ["TECHNICAL"] })).toBe(true);
+    expect(canCreateAndAssignTasks({ roles: ["ADMINISTRATOR"] })).toBe(true);
+  });
+  it("lässt zugewiesene Mitarbeiter arbeiten und abschliessen, aber nicht verwalten", () => {
+    const access = taskAccess(
+      { id: "u2", roles: ["EMPLOYEE"] },
+      { createdById: "u1", responsibleUserId: "u2", status: "IN_PROGRESS" },
+    );
+    expect(access.responsible).toBe(true);
+    expect(access.canComplete).toBe(true);
+    expect(access.full).toBe(false);
+  });
+  it("erlaubt technische Aufgaben während offener AVOR-Freigabe und sperrt geschlossene Anträge", () => {
+    expect(taskWorkAvailable("UNDER_REVIEW")).toBe(true);
+    expect(taskWorkAvailable("CLOSED")).toBe(false);
   });
   it("setzt und leert Abschlussmetadaten", () => {
     expect(completionMetadata("OPEN", "DONE", "u2")).toMatchObject({

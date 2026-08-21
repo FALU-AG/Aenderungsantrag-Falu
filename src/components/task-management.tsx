@@ -47,6 +47,7 @@ export function TaskManagement({
   users,
   currentUserId,
   isAdmin,
+  canCreateAndAssign,
   readOnly = false,
 }: {
   requestId: string;
@@ -54,11 +55,12 @@ export function TaskManagement({
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  canCreateAndAssign: boolean;
   readOnly?: boolean;
 }) {
   return (
     <div className="space-y-5">
-      {!readOnly && (
+      {!readOnly && canCreateAndAssign && (
         <details>
           <summary className="ml-auto w-fit cursor-pointer list-none rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white">
             Aufgabe erstellen
@@ -73,6 +75,7 @@ export function TaskManagement({
         users={users}
         currentUserId={currentUserId}
         isAdmin={isAdmin}
+        canCreateAndAssign={canCreateAndAssign}
         readOnly={readOnly}
       />
     </div>
@@ -83,12 +86,14 @@ export function TaskList({
   users,
   currentUserId,
   isAdmin,
+  canCreateAndAssign = false,
   readOnly = false,
 }: {
   tasks: TaskView[];
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  canCreateAndAssign?: boolean;
   readOnly?: boolean;
 }) {
   const active = tasks.filter((t) => t.status !== "DONE"),
@@ -113,6 +118,7 @@ export function TaskList({
                 users={users}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
+                canCreateAndAssign={canCreateAndAssign}
                 readOnly={readOnly}
               />
             ))}
@@ -132,6 +138,7 @@ export function TaskList({
                 users={users}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
+                canCreateAndAssign={canCreateAndAssign}
                 readOnly={readOnly}
               />
             ))}
@@ -192,12 +199,14 @@ function TaskCard({
   users,
   currentUserId,
   isAdmin,
+  canCreateAndAssign,
   readOnly,
 }: {
   task: TaskView;
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
+  canCreateAndAssign: boolean;
   readOnly: boolean;
 }) {
   const [state, action, pending] = useActionState(
@@ -205,7 +214,10 @@ function TaskCard({
     {} as TaskActionState,
   );
   const locked = readOnly || Boolean(task.closed);
-  const full = !locked && (isAdmin || task.createdById === currentUserId),
+  const full =
+      !locked &&
+      (isAdmin ||
+        (canCreateAndAssign && task.createdById === currentUserId)),
     responsible = task.responsibleUserId === currentUserId,
     editable = !locked && (full || responsible);
   return (
@@ -320,18 +332,32 @@ function Fields({
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Select
-        name="responsibleUserId"
-        label="Verantwortlich"
-        value={task?.responsibleUserId ?? ""}
-        disabled={!full}
-      >
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </Select>
+      {full ? (
+        <Select
+          name="responsibleUserId"
+          label="Verantwortlich"
+          value={task?.responsibleUserId ?? ""}
+          disabled={false}
+        >
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <div className="text-sm">
+          <p className="font-medium">Verantwortlich</p>
+          <p className="mt-2 rounded-md border bg-slate-50 px-3 py-2.5 text-slate-600">
+            {task?.responsibleUser?.name ?? "Nicht zugewiesen"}
+          </p>
+          <input
+            type="hidden"
+            name="responsibleUserId"
+            value={task?.responsibleUserId ?? ""}
+          />
+        </div>
+      )}
       <Select
         name="department"
         label="Abteilung"

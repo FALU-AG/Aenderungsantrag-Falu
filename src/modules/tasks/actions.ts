@@ -9,6 +9,7 @@ import {
   taskAccess,
   taskAudit,
   taskSchema,
+  taskWorkAvailable,
   TASK_STATUS_LABELS,
   type TaskStatusKey,
 } from "./domain";
@@ -45,7 +46,7 @@ export async function createTask(
     where: { id: requestId },
     select: { status: true },
   });
-  if (request.status === "CLOSED")
+  if (!taskWorkAvailable(request.status))
     return {
       message: "Abgeschlossene Änderungsanträge sind schreibgeschützt.",
     };
@@ -105,7 +106,7 @@ export async function updateTask(
         changeRequest: { select: { status: true } },
       },
     });
-    if (old.changeRequest.status === "CLOSED")
+    if (!taskWorkAvailable(old.changeRequest.status))
       throw new Error("Abgeschlossene Änderungsanträge sind schreibgeschützt.");
     const access = taskAccess(user, {
       ...old,
@@ -113,6 +114,11 @@ export async function updateTask(
     });
     if (!access.full && !access.responsible)
       throw new Error("Sie dürfen diese Aufgabe nicht bearbeiten.");
+    if (
+      !access.full &&
+      parsed.data.responsibleUserId !== old.responsibleUserId
+    )
+      throw new Error("Sie dürfen Aufgaben nicht anderen Personen zuweisen.");
     if (!access.canComplete && parsed.data.status === "DONE")
       throw new Error("Sie dürfen diese Aufgabe nicht abschliessen.");
     const responsible = await tx.user.findFirst({
@@ -222,7 +228,7 @@ export async function deleteOpenTask(taskId: string) {
       where: { id: taskId },
       include: { changeRequest: { select: { status: true } } },
     });
-    if (task.changeRequest.status === "CLOSED")
+    if (!taskWorkAvailable(task.changeRequest.status))
       throw new Error("Abgeschlossene Änderungsanträge sind schreibgeschützt.");
     if (
       !taskAccess(user, { ...task, status: task.status as TaskStatusKey })

@@ -1,6 +1,7 @@
 import { PageHeading } from "@/components/page-heading";
 import { TaskList } from "@/components/task-management";
 import { getCurrentUser } from "@/modules/auth";
+import { hasPermission } from "@/modules/authorization/permissions";
 import {
   DEPARTMENT_LABELS,
   isTaskOverdue,
@@ -133,6 +134,7 @@ export default async function TasksPage({
         users={users}
         currentUserId={user.id}
         isAdmin={user.roles.includes("ADMINISTRATOR")}
+        canCreateAndAssign={hasPermission(user, "TASK_CREATE")}
       />
     </>
   );
