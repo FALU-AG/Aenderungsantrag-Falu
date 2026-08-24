@@ -135,7 +135,8 @@ model MachineType {
   active    Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  requests  ChangeRequest[]
+  legacyRequests ChangeRequest[]            @relation("LegacyMachineType")
+  requests       ChangeRequestMachineType[]
 }
 
 model ChangeRequestCounter {
@@ -160,7 +161,7 @@ model ChangeRequest {
   title              String                @default("")
   applicantId        String
   applicantName      String                @default("")
-  machineTypeId      String?
+  legacyMachineTypeId String?               @map("machineTypeId")
   articleNumber      String?
   articleDescription String?
   description        String                @default("")
@@ -177,7 +178,8 @@ model ChangeRequest {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   applicant          User                  @relation("Applicant", fields: [applicantId], references: [id])
-  machineType        MachineType?          @relation(fields: [machineTypeId], references: [id])
+  legacyMachineType  MachineType?          @relation("LegacyMachineType", fields: [legacyMachineTypeId], references: [id])
+  machineTypes       ChangeRequestMachineType[]
   closedBy           User?                 @relation("ClosedBy", fields: [closedById], references: [id])
   reasons            ChangeRequestReason[]
   approvals          Approval[]
@@ -191,9 +193,19 @@ model ChangeRequest {
   auditEvents        AuditEvent[]
 
   @@index([status])
-  @@index([machineTypeId])
+  @@index([legacyMachineTypeId])
   @@index([applicantId])
   @@index([updatedAt])
+}
+
+model ChangeRequestMachineType {
+  changeRequestId String
+  machineTypeId   String
+  changeRequest   ChangeRequest @relation(fields: [changeRequestId], references: [id], onDelete: Cascade)
+  machineType     MachineType   @relation(fields: [machineTypeId], references: [id], onDelete: Restrict)
+
+  @@id([changeRequestId, machineTypeId])
+  @@index([machineTypeId])
 }
 
 model ChangeRequestReason {

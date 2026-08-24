@@ -37,7 +37,7 @@ export default async function DashboardPage() {
       db.changeRequest.findMany({
         take: 6,
         orderBy: { updatedAt: "desc" },
-        include: { machineType: true },
+        include: { machineTypes: { include: { machineType: true }, orderBy: { machineType: { code: "asc" } } } },
       }),
     ]);
   const avor = reviewing.filter((r) =>
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
                   <td className="px-5 py-4">
                     {r.title || "Unbenannter Entwurf"}
                   </td>
-                  <td className="px-5 py-4">{r.machineType?.code ?? "–"}</td>
+                  <td className="px-5 py-4">{r.machineTypes.map(({machineType})=>machineType.code).join(", ") || "–"}</td>
                   <td className="px-5 py-4">
                     <StatusBadge status={r.status as ChangeRequestStatusKey} />
                   </td>
@@ -120,7 +120,7 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         </div>
-        <div className="divide-y divide-slate-100 md:hidden">{recent.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block px-4 py-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-medium text-slate-900">{r.title||"Unbenannter Entwurf"}</p><p className="mt-1 text-sm text-slate-500">Maschinentyp: {r.machineType?.code??"–"}</p></Link>)}</div>
+        <div className="divide-y divide-slate-100 md:hidden">{recent.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block px-4 py-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-medium text-slate-900">{r.title||"Unbenannter Entwurf"}</p><div className="mt-2 flex flex-wrap gap-1">{r.machineTypes.length?r.machineTypes.map(({machineType})=><span key={machineType.id} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{machineType.code}</span>):<span className="text-sm text-slate-500">–</span>}</div></Link>)}</div>
       </Card>
     </>
   );

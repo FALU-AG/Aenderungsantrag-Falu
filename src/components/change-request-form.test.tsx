@@ -7,7 +7,7 @@ vi.mock("@/modules/assist/actions", () => ({ formulateText: vi.fn(), transcribeS
 import { ChangeRequestForm } from "./change-request-form";
 
 afterEach(cleanup);
-const props = { machineTypes: [{ id: "m1", label: "SQB-2AT" }], reasons: [{ id: "r1", label: "Kundenwunsch" }] };
+const props = { machineTypes: [{ id: "m1", label: "SQB-2AT", active: true }, { id: "m2", label: "CB1", active: true }], reasons: [{ id: "r1", label: "Kundenwunsch" }] };
 
 describe("ChangeRequestForm UX", () => {
   it("befüllt den Antragsteller mit dem angemeldeten Benutzer und lässt ihn änderbar", async () => {
@@ -24,7 +24,7 @@ describe("ChangeRequestForm UX", () => {
     render(<ChangeRequestForm {...props} />);
     const title = screen.getByPlaceholderText("z. B. Riemenspanner hält Spannung nicht");
     expect(title).toHaveValue("");
-    expect(screen.getByPlaceholderText("z. B. 116-2458")).toHaveValue("");
+    expect(screen.getByPlaceholderText("z. B. CBX.220.259-C")).toHaveValue("");
     expect(screen.getByPlaceholderText("z. B. Halteplatte Riemenspanner")).toHaveValue("");
     expect(screen.getByPlaceholderText("z. B. Der Riemen verliert nach kurzer Laufzeit die erforderliche Spannung.")).toHaveValue("");
   });
@@ -38,7 +38,17 @@ describe("ChangeRequestForm UX", () => {
   });
 
   it("überschreibt den Antragsteller eines bestehenden Antrags nicht", () => {
-    render(<ChangeRequestForm {...props} defaultApplicantName="Florian Kaufmann" initial={{ id: "cr1", version: 1, number: "CR-2026-001", createdAt: "20.08.2026", applicantName: "Marc Wyss", title: "", machineTypeId: "", articleNumber: "", articleDescription: "", reasonIds: [], otherReasonText: "", description: "" }} />);
+    render(<ChangeRequestForm {...props} defaultApplicantName="Florian Kaufmann" initial={{ id: "cr1", version: 1, number: "CR-2026-001", createdAt: "20.08.2026", applicantName: "Marc Wyss", title: "", machineTypeIds: [], articleNumber: "", articleDescription: "", reasonIds: [], otherReasonText: "", description: "" }} />);
     expect(screen.getByRole("textbox", { name: /Antragsteller/ })).toHaveValue("Marc Wyss");
+  });
+  it("wählt mehrere Maschinentypen touch-freundlich aus und zeigt sie als Chips", async () => {
+    const user = userEvent.setup();
+    render(<ChangeRequestForm {...props} />);
+    await user.click(screen.getByRole("button", { name: /Maschine auswählen/ }));
+    await user.click(screen.getByRole("button", { name: "SQB-2AT" }));
+    await user.click(screen.getByRole("button", { name: "CB1" }));
+    expect(screen.getByRole("button", { name: "SQB-2AT entfernen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "CB1 entfernen" })).toBeInTheDocument();
+    expect(document.querySelectorAll('input[name="machineTypeIds"]')).toHaveLength(2);
   });
 });

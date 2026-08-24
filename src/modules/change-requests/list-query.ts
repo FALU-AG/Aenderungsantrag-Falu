@@ -7,8 +7,8 @@ const value = (v: string | string[] | undefined) => typeof v === "string" ? v : 
 export function buildRequestListQuery(params: ListParams, currentUserId?: string): { where: Prisma.ChangeRequestWhereInput; orderBy: Prisma.ChangeRequestOrderByWithRelationInput; page: number } {
   const q = value(params.q).trim(); const status = value(params.status); const year = Number(value(params.year)); const view = value(params.view);
   const where: Prisma.ChangeRequestWhereInput = {
-    ...(q ? { OR: ["number", "title", "articleNumber", "articleDescription", "description"].map((field) => ({ [field]: { contains: q, mode: "insensitive" } })) } : {}),
-    ...(value(params.machineTypeId) ? { machineTypeId: value(params.machineTypeId) } : {}),
+    ...(q ? { OR: [...["number", "title", "articleNumber", "articleDescription", "description"].map((field) => ({ [field]: { contains: q, mode: "insensitive" as const } })), { machineTypes: { some: { machineType: { code: { contains: q, mode: "insensitive" } } } } }] } : {}),
+    ...(value(params.machineTypeId) ? { machineTypes: { some: { machineTypeId: value(params.machineTypeId) } } } : {}),
     ...(view === "closed" ? { status: "CLOSED" } : view === "open" ? { status: { not: "CLOSED" } } : CHANGE_REQUEST_STATUSES.includes(status as never) ? { status: status as Prisma.EnumChangeRequestStatusFilter } : {}),
     ...(view === "mine" && currentUserId ? { applicantId: currentUserId } : {}),
     ...(value(params.applicantId) ? { applicantId: value(params.applicantId) } : {}),

@@ -7,7 +7,7 @@ import { buildRequestListQuery } from "./list-query";
 const valid = {
   applicantName: "Jeremy Imoberdorf",
   title: "Neue Führung",
-  machineTypeId: "machine-1",
+  machineTypeIds: ["machine-1"],
   articleNumber: "4711",
   articleDescription: "Kettenführung",
   reasonIds: ["reason-1"],
@@ -35,6 +35,15 @@ describe("Antragsaufnahme", () => {
   });
   it("validiert eine vollständige Einreichung", () =>
     expect(submissionSchema("other").safeParse(valid).success).toBe(true));
+  it("akzeptiert einen oder mehrere Maschinentypen", () => {
+    expect(submissionSchema().safeParse(valid).success).toBe(true);
+    expect(submissionSchema().safeParse({ ...valid, machineTypeIds: ["machine-1", "machine-2"] }).success).toBe(true);
+  });
+  it("verlangt mindestens einen Maschinentyp", () => expect(submissionSchema().safeParse({ ...valid, machineTypeIds: [] }).success).toBe(false));
+  it("weist inaktive oder unbekannte Maschinentypen ab und erlaubt historische explizit", () => {
+    expect(submissionSchema(undefined, undefined, new Set(["machine-1"])).safeParse({ ...valid, machineTypeIds: ["inactive"] }).success).toBe(false);
+    expect(submissionSchema(undefined, undefined, new Set(["inactive"])).safeParse({ ...valid, machineTypeIds: ["inactive"] }).success).toBe(true);
+  });
   it.each([
     ["applicantName", "Bitte einen Antragsteller eingeben."],
     ["articleNumber", "Bitte eine Artikel- oder Baugruppennummer eingeben."],
@@ -119,6 +128,10 @@ describe("Antragsaufnahme", () => {
     expect(result.where).toMatchObject({ status: "DRAFT" });
     expect(result.orderBy).toEqual({ title: "asc" });
   });
+  it("filtert und sucht über jede verknüpfte Maschine", () => {
+    expect(buildRequestListQuery({ machineTypeId: "m2" }).where).toMatchObject({ machineTypes: { some: { machineTypeId: "m2" } } });
+    expect(buildRequestListQuery({ q: "SV-2X" }).where.OR).toContainEqual({ machineTypes: { some: { machineType: { code: { contains: "SV-2X", mode: "insensitive" } } } } });
+  });
   it("ändert beim Bearbeiten nur den Antragstellernamen, nicht den Ersteller", () => {
     expect(editableApplicant(" Marc Wyss ")).toEqual({ applicantName: "Marc Wyss" });
     expect(editableApplicant("Marc Wyss")).not.toHaveProperty("applicantId");
@@ -127,6 +140,13 @@ describe("Antragsaufnahme", () => {
     const form = new FormData();
     expect(formDataToInput(form).title).toBe("");
     expect(formDataToInput(form).applicantName).toBe("");
+  });
+  it("dedupliziert doppelt gesendete Maschinen-IDs sicher", () => {
+    const form = new FormData();
+    form.append("machineTypeIds", "m1");
+    form.append("machineTypeIds", "m1");
+    form.append("machineTypeIds", "m2");
+    expect(formDataToInput(form).machineTypeIds).toEqual(["m1", "m2"]);
   });
   it("filtert Abgeschlossen ausschliesslich auf CLOSED", () => {
     expect(buildRequestListQuery({ view: "closed" }).where).toMatchObject({ status: "CLOSED" });

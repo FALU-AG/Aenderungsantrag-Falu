@@ -399,7 +399,7 @@ async function main() {
         title: sample.title,
         applicantId: sample.applicantId,
         applicantName: applicantName(sample.applicantId),
-        machineTypeId: sample.machineTypeId,
+        legacyMachineTypeId: sample.machineTypeId,
         articleNumber: `ART-${sample.number.slice(-3)}`,
         articleDescription: sample.title,
         description: sample.description,
@@ -413,6 +413,11 @@ async function main() {
           })),
         },
       },
+    });
+    await prisma.changeRequestMachineType.upsert({
+      where: { changeRequestId_machineTypeId: { changeRequestId: request.id, machineTypeId: sample.machineTypeId } },
+      update: {},
+      create: { changeRequestId: request.id, machineTypeId: sample.machineTypeId },
     });
     if (sample.status !== "DRAFT")
       for (const type of ["AVOR", "TECHNICAL"] as const)

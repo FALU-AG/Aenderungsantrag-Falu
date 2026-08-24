@@ -17,6 +17,7 @@ import { generateChangeRequestNumber } from "./numbering";
 import { requireDraftEdit } from "./authorization";
 import { cleanupUploadedAttachment, removeStoredAttachment, supabaseObjectKey, uploadNewAttachment } from "@/server/storage/attachment-storage";
 import { submissionData } from "./submission";
+import { machineTypeChangeSummary } from "./machine-type-change";
 
 export type FormState = { errors?: Record<string, string[]>; message?: string };
 const errorsOf = (error: {
@@ -47,15 +48,25 @@ export async function saveChangeRequest(
       : { active: true },
     select: { id: true },
   });
+  const selectableMachines = await db.machineType.findMany({
+    where: id
+      ? { OR: [{ active: true }, { requests: { some: { changeRequestId: id } } }] }
+      : { active: true },
+    select: { id: true },
+  });
+  const allowedMachineTypeIds = new Set(selectableMachines.map((machine) => machine.id));
   const parsed = (
     intent === "submit"
       ? submissionSchema(
           other?.id,
           new Set(selectableReasons.map((reason) => reason.id)),
+          allowedMachineTypeIds,
         )
       : draftSchema
   ).safeParse(input);
   if (!parsed.success) return errorsOf(parsed.error);
+  if (parsed.data.machineTypeIds.some((machineId) => !allowedMachineTypeIds.has(machineId)))
+    return { errors: { machineTypeIds: ["Ein ausgewählter Maschinentyp ist nicht aktiv oder unbekannt."] } };
   let requestId = id;
 
   await db.$transaction(async (tx) => {
@@ -67,6 +78,7 @@ export async function saveChangeRequest(
           status: true,
           version: true,
           approvalCycle: true,
+          machineTypes: { include: { machineType: { select: { code: true } } } },
         },
       });
       requireDraftEdit(user, existing);
@@ -75,7 +87,6 @@ export async function saveChangeRequest(
         data: {
           title: parsed.data.title,
           ...editableApplicant(parsed.data.applicantName),
-          machineTypeId: parsed.data.machineTypeId || null,
           articleNumber: parsed.data.articleNumber || null,
           articleDescription: parsed.data.articleDescription || null,
           description: parsed.data.description,
@@ -97,6 +108,20 @@ export async function saveChangeRequest(
             changeReasonId,
           })),
         });
+      const previousMachines = new Map(existing.machineTypes.map(({ machineTypeId, machineType }) => [machineTypeId, machineType.code]));
+      const nextMachineIds = new Set(parsed.data.machineTypeIds);
+      const addedIds = parsed.data.machineTypeIds.filter((machineId) => !previousMachines.has(machineId));
+      const removed = existing.machineTypes.filter(({ machineTypeId }) => !nextMachineIds.has(machineTypeId));
+      await tx.changeRequestMachineType.deleteMany({
+        where: {
+          changeRequestId: id,
+          ...(parsed.data.machineTypeIds.length ? { machineTypeId: { notIn: parsed.data.machineTypeIds } } : {}),
+        },
+      });
+      if (addedIds.length) await tx.changeRequestMachineType.createMany({ data: addedIds.map((machineTypeId) => ({ changeRequestId: id, machineTypeId })), skipDuplicates: true });
+      const addedMachines = addedIds.length ? await tx.machineType.findMany({ where: { id: { in: addedIds } }, select: { code: true } }) : [];
+      const addedCodes = addedMachines.map(({ code }) => code);
+      const removedCodes = removed.map(({ machineType }) => machineType.code);
       await tx.auditEvent.create({
         data: {
           changeRequestId: id,
@@ -105,9 +130,29 @@ export async function saveChangeRequest(
           entityType: "ChangeRequest",
           entityId: id,
           summary: "Entwurf aktualisiert",
-          details: { version: existing.version + 1 },
+          details: {
+            version: existing.version + 1,
+            ...(addedMachines.length || removed.length ? {
+              machineTypes: {
+                added: addedCodes,
+                removed: removedCodes,
+              },
+            } : {}),
+          },
         },
       });
+      if (addedCodes.length || removedCodes.length)
+        await tx.auditEvent.create({
+          data: {
+            changeRequestId: id,
+            userId: user.id,
+            action: "MACHINE_TYPES_CHANGED",
+            entityType: "ChangeRequest",
+            entityId: id,
+            summary: machineTypeChangeSummary(addedCodes, removedCodes),
+            details: { added: addedCodes, removed: removedCodes },
+          },
+        });
       if (
         existing.status === "CHANGES_REQUESTED" &&
         (await tx.auditEvent.count({
@@ -139,7 +184,6 @@ export async function saveChangeRequest(
           number,
           title: parsed.data.title,
           ...creatorAndApplicant(user.id, parsed.data.applicantName),
-          machineTypeId: parsed.data.machineTypeId || null,
           articleNumber: parsed.data.articleNumber || null,
           articleDescription: parsed.data.articleDescription || null,
           description: parsed.data.description,
@@ -148,6 +192,9 @@ export async function saveChangeRequest(
             create: parsed.data.reasonIds.map((changeReasonId) => ({
               changeReasonId,
             })),
+          },
+          machineTypes: {
+            create: parsed.data.machineTypeIds.map((machineTypeId) => ({ machineTypeId })),
           },
         },
       });
@@ -310,7 +357,7 @@ export async function submitExistingRequest(requestId: string) {
   const user = await getCurrentUser();
   const request = await db.changeRequest.findUniqueOrThrow({
     where: { id: requestId },
-    include: { reasons: true },
+    include: { reasons: true, machineTypes: true },
   });
   requireDraftEdit(user, request);
   const other = await db.changeReason.findFirst({
@@ -330,10 +377,14 @@ export async function submitExistingRequest(requestId: string) {
       })
     ).map((reason) => reason.id),
   );
-  submissionSchema(other?.id, allowedReasonIds).parse({
+  const allowedMachineTypeIds = new Set((await db.machineType.findMany({
+    where: { OR: [{ active: true }, { requests: { some: { changeRequestId: requestId } } }] },
+    select: { id: true },
+  })).map(({ id }) => id));
+  submissionSchema(other?.id, allowedReasonIds, allowedMachineTypeIds).parse({
     applicantName: request.applicantName,
     title: request.title,
-    machineTypeId: request.machineTypeId ?? "",
+    machineTypeIds: request.machineTypes.map(({ machineTypeId }) => machineTypeId),
     articleNumber: request.articleNumber ?? "",
     articleDescription: request.articleDescription ?? "",
     reasonIds: request.reasons.map((reason) => reason.changeReasonId),

@@ -21,7 +21,7 @@ const load = cache(async (userId: string, rolesKey: string) => {
             number: true,
             title: true,
             status: true,
-            machineType: { select: { code: true } },
+            machineTypes: { select: { machineType: { select: { code: true } } } },
           },
         },
       },
@@ -36,7 +36,7 @@ const load = cache(async (userId: string, rolesKey: string) => {
             status: true,
             approvalCycle: true,
             finalReviewCycle: true,
-            machineType: { select: { code: true } },
+            machineTypes: { select: { machineType: { select: { code: true } } } },
             approvals: {
               select: { type: true, status: true, cycle: true },
             },

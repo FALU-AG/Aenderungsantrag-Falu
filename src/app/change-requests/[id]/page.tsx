@@ -100,7 +100,7 @@ export default async function RequestDetailPage({
     where: { id },
     include: {
       applicant: true,
-      machineType: true,
+      machineTypes: { include: { machineType: true }, orderBy: { machineType: { code: "asc" } } },
       reasons: { include: { changeReason: true } },
       approvals: {
         include: { decisionUser: true },
@@ -167,7 +167,7 @@ export default async function RequestDetailPage({
             {request.title || "Unbenannter Entwurf"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {request.machineType?.code ?? "Kein Maschinentyp"} ·{" "}
+            {request.machineTypes.map(({ machineType }) => machineType.code).join(", ") || "Kein Maschinentyp"} ·{" "}
             Antragsteller: {request.applicantName || "–"} · Aktualisiert{" "}
             {formatDate(request.updatedAt)}
           </p>
@@ -809,6 +809,7 @@ function Overview({
     articleNumber: string | null;
     articleDescription: string | null;
     description: string;
+    machineTypes: { machineType: { id: string; code: string; active: boolean } }[];
     reasons: { changeReason: { label: string } }[];
   };
   current: ApprovalView[];
@@ -852,6 +853,10 @@ function Overview({
         <h2 className="font-semibold">Antragsdetails</h2>
         <dl className="mt-5 grid gap-5 md:grid-cols-2">
           <RequestIdentity creatorName={request.applicant.name} applicantName={request.applicantName} createdAt={formatDate(request.createdAt)} />
+          <div className="md:col-span-2">
+            <dt className="text-xs font-medium uppercase text-slate-500">Maschinentypen</dt>
+            <dd className="mt-2 flex flex-wrap gap-2">{request.machineTypes.length ? request.machineTypes.map(({ machineType }) => <span key={machineType.id} className="rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-700">{machineType.code}{!machineType.active ? " (historisch)" : ""}</span>) : <span className="text-sm">–</span>}</dd>
+          </div>
           <Item l="Artikel-/Baugruppennummer" v={request.articleNumber} />
           <Item
             l="Artikel-/Baugruppenbezeichnung"

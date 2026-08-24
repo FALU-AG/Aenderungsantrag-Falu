@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   saveChangeRequest,
@@ -19,7 +20,7 @@ type Option = {
 type Values = {
   applicantName: string;
   title: string;
-  machineTypeId: string;
+  machineTypeIds: string[];
   articleNumber: string;
   articleDescription: string;
   reasonIds: string[];
@@ -27,7 +28,7 @@ type Values = {
   description: string;
 };
 type Props = {
-  machineTypes: { id: string; label: string }[];
+  machineTypes: { id: string; label: string; active: boolean }[];
   reasons: Option[];
   defaultApplicantName?: string;
   initial?: Values & {
@@ -44,11 +45,11 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
     saveChangeRequest,
     initialState,
   );
-  const { register, control } = useForm<Values>({
+  const { register, control, setValue } = useForm<Values>({
     defaultValues: initial ?? {
       applicantName: defaultApplicantName,
       title: "",
-      machineTypeId: "",
+      machineTypeIds: [],
       articleNumber: "",
       articleDescription: "",
       reasonIds: [],
@@ -57,13 +58,11 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
     },
   });
   const selected = useWatch({ control, name: "reasonIds" }) ?? [];
-  const selectedMachineTypeId = useWatch({ control, name: "machineTypeId" });
+  const selectedMachineTypeIds = useWatch({ control, name: "machineTypeIds" }) ?? [];
   const articleNumber = useWatch({ control, name: "articleNumber" });
-  const selectedMachine = machineTypes.find(
-    (machine) => machine.id === selectedMachineTypeId,
-  );
+  const selectedMachines = machineTypes.filter((machine) => selectedMachineTypeIds.includes(machine.id));
   const writingContext = [
-    selectedMachine ? `Maschinentyp: ${selectedMachine.label}` : "",
+    selectedMachines.length ? `Maschinentypen: ${selectedMachines.map(({ label }) => label).join(", ")}` : "",
     articleNumber ? `Artikel-/Baugruppennummer: ${articleNumber}` : "",
   ]
     .filter(Boolean)
@@ -114,18 +113,16 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
               placeholder="z. B. Riemenspanner hält Spannung nicht"
             />
           </div>
-          <label>
-            <span className="text-sm font-medium">Maschinentyp *</span>
-            <select {...register("machineTypeId")} className={input}>
-              <option value="">Bitte wählen</option>
-              {machineTypes.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <Error text={error("machineTypeId")} />
-          </label>
+          <div>
+            <span className="text-sm font-medium">Maschinentyp(en) *</span>
+            <MachineTypeMultiSelect
+              options={machineTypes}
+              selectedIds={selectedMachineTypeIds}
+              onChange={(machineTypeIds) => setValue("machineTypeIds", machineTypeIds, { shouldDirty: true })}
+            />
+            {selectedMachineTypeIds.map((id) => <input key={id} type="hidden" name="machineTypeIds" value={id} />)}
+            <Error text={error("machineTypeIds")} />
+          </div>
         </div>
       </Card>
       <Card className="p-4 sm:p-6">
@@ -135,7 +132,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
             <span className="text-sm font-medium">
               Artikel-/Baugruppennummer *
             </span>
-            <input {...register("articleNumber")} placeholder="z. B. 116-2458" className={input} />
+            <input {...register("articleNumber")} placeholder="z. B. CBX.220.259-C" className={input} />
             <Error text={error("articleNumber")} />
           </label>
           <label>
@@ -239,6 +236,24 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
       </div>
     </form>
   );
+}
+function MachineTypeMultiSelect({ options, selectedIds, onChange }: { options: { id: string; label: string; active: boolean }[]; selectedIds: string[]; onChange: (ids: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const selected = options.filter(({ id }) => selectedIds.includes(id));
+  const visible = options.filter(({ label }) => label.toLocaleLowerCase("de-CH").includes(search.trim().toLocaleLowerCase("de-CH")));
+  const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((value) => value !== id) : [...selectedIds, id]);
+  return <div className="relative mt-1.5">
+    <div className="flex min-h-11 flex-wrap gap-2 rounded-md border border-slate-300 bg-white p-2">
+      {selected.map((machine) => <span key={machine.id} className="inline-flex min-h-8 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-sm font-medium text-[#175f91]">{machine.label}{!machine.active && <span className="text-xs text-slate-500">historisch</span>}<button type="button" aria-label={`${machine.label} entfernen`} onClick={() => toggle(machine.id)} className="grid size-6 place-items-center rounded-full hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-[#175f91]"><X className="size-3.5" aria-hidden="true" /></button></span>)}
+      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-8 flex-1 items-center justify-between gap-2 rounded px-2 text-left text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#175f91]"><span>{selected.length ? "Maschine hinzufügen…" : "Maschine auswählen…"}</span><ChevronDown className="size-4 shrink-0" aria-hidden="true" /></button>
+    </div>
+    {open && <div role="dialog" aria-label="Maschinentypen auswählen" className="absolute z-30 mt-2 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
+      <input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Maschinentyp suchen" placeholder="Maschinentyp suchen…" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+      <div className="max-h-64 overflow-y-auto">{visible.map((machine) => { const checked = selectedIds.includes(machine.id); const unavailable = !machine.active && !checked; return <button key={machine.id} type="button" disabled={unavailable} onClick={() => toggle(machine.id)} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"><span className={`grid size-5 place-items-center rounded border ${checked ? "border-[#175f91] bg-[#175f91] text-white" : "border-slate-300"}`}>{checked && <Check className="size-3.5" aria-hidden="true" />}</span><span>{machine.label}{!machine.active ? " (historisch)" : ""}</span></button> })}{!visible.length && <p className="p-3 text-sm text-slate-500">Keine Maschinentypen gefunden.</p>}</div>
+      <button type="button" onClick={() => setOpen(false)} className="mt-3 min-h-11 w-full rounded-md bg-[#175f91] px-4 text-sm font-semibold text-white">Auswahl übernehmen</button>
+    </div>}
+  </div>;
 }
 function ReadOnly({ label, value }: { label: string; value: string }) {
   return (

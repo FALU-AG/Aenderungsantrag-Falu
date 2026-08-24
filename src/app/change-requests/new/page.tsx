@@ -25,7 +25,7 @@ export default async function NewRequestPage() {
       />
       <ChangeRequestForm
         defaultApplicantName={user.name}
-        machineTypes={machines.map((m) => ({ id: m.id, label: m.code }))}
+        machineTypes={machines.map((m) => ({ id: m.id, label: m.code, active: m.active }))}
         reasons={reasons.map((r) => ({
           id: r.id,
           label: r.label,

@@ -9,7 +9,7 @@ const baseSchema = z.object({
     .string()
     .trim()
     .max(200, "Der Titel darf höchstens 200 Zeichen enthalten."),
-  machineTypeId: z.string().trim(),
+  machineTypeIds: z.array(z.string().trim().min(1)),
   articleNumber: z
     .string()
     .trim()
@@ -35,6 +35,7 @@ export const draftSchema = baseSchema;
 export function submissionSchema(
   otherReasonId?: string,
   allowedReasonIds?: ReadonlySet<string>,
+  allowedMachineTypeIds?: ReadonlySet<string>,
 ) {
   return baseSchema.superRefine((data, ctx) => {
     if (!data.applicantName)
@@ -49,11 +50,17 @@ export function submissionSchema(
         path: ["title"],
         message: "Titel ist erforderlich.",
       });
-    if (!data.machineTypeId)
+    if (data.machineTypeIds.length === 0)
       ctx.addIssue({
         code: "custom",
-        path: ["machineTypeId"],
-        message: "Maschinentyp ist erforderlich.",
+        path: ["machineTypeIds"],
+        message: "Wählen Sie mindestens einen Maschinentyp.",
+      });
+    if (allowedMachineTypeIds && data.machineTypeIds.some((id) => !allowedMachineTypeIds.has(id)))
+      ctx.addIssue({
+        code: "custom",
+        path: ["machineTypeIds"],
+        message: "Ein ausgewählter Maschinentyp ist nicht aktiv oder unbekannt.",
       });
     if (!data.articleNumber)
       ctx.addIssue({
@@ -122,7 +129,7 @@ export function formDataToInput(formData: FormData): ChangeRequestInput {
   return {
     applicantName: String(formData.get("applicantName") ?? ""),
     title: String(formData.get("title") ?? ""),
-    machineTypeId: String(formData.get("machineTypeId") ?? ""),
+    machineTypeIds: [...new Set(formData.getAll("machineTypeIds").map(String).filter(Boolean))],
     articleNumber: String(formData.get("articleNumber") ?? ""),
     articleDescription: String(formData.get("articleDescription") ?? ""),
     reasonIds: formData.getAll("reasonIds").map(String),

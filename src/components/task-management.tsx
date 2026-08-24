@@ -38,7 +38,7 @@ export type TaskView = {
     id: string;
     number: string;
     title: string;
-    machineType: { code: string } | null;
+    machineTypes: { machineType: { code: string } }[];
   };
 };
 export function TaskManagement({

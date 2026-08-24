@@ -23,7 +23,7 @@ export type RequestRef = {
   status: string;
   approvalCycle: number;
   finalReviewCycle: number;
-  machineType: { code: string } | null;
+  machineTypes: { machineType: { code: string } }[];
   approvals: Array<{
     type: "AVOR" | "TECHNICAL";
     status: "PENDING" | "APPROVED" | "REJECTED";
@@ -42,7 +42,7 @@ export type TaskRef = {
   dueDate: Date | null;
   changeRequest: Pick<
     RequestRef,
-    "id" | "number" | "title" | "status" | "machineType"
+    "id" | "number" | "title" | "status" | "machineTypes"
   >;
 };
 
@@ -55,7 +55,7 @@ export type InboxItem = {
   requestId: string;
   requestNumber: string;
   requestTitle: string;
-  machineType: string | null;
+  machineTypes: string[];
   statusLabel: string;
   dueDate: Date | null;
   priority: TaskRef["priority"] | null;
@@ -86,7 +86,7 @@ const workflowItem = (
   requestId: request.id,
   requestNumber: request.number,
   requestTitle: request.title,
-  machineType: request.machineType?.code ?? null,
+  machineTypes: request.machineTypes.map(({ machineType }) => machineType.code),
   statusLabel: "Offen",
   dueDate: null,
   priority: null,
@@ -229,7 +229,7 @@ export function buildPersonalInbox({
       requestId: task.changeRequest.id,
       requestNumber: task.changeRequest.number,
       requestTitle: task.changeRequest.title,
-      machineType: task.changeRequest.machineType?.code ?? null,
+      machineTypes: task.changeRequest.machineTypes.map(({ machineType }) => machineType.code),
       statusLabel:
         task.status === "OPEN"
           ? "Offen"

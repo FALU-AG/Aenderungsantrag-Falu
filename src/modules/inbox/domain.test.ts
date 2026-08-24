@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildPersonalInbox, filterInbox, type RequestRef, type TaskRef } from "./domain";
 
-const request=(overrides:Partial<RequestRef>={}):RequestRef=>({id:"cr-1",number:"CR-2026-031",title:"Riemenspanner",status:"UNDER_REVIEW",approvalCycle:2,finalReviewCycle:1,machineType:{code:"CB1"},approvals:[{type:"AVOR",status:"PENDING",cycle:2},{type:"TECHNICAL",status:"PENDING",cycle:2}],finalApprovals:[],technicalReview:null,avorImpactReview:null,purchasingReview:null,...overrides});
-const task=(overrides:Partial<TaskRef>={}):TaskRef=>({id:"task-1",title:"Zeichnung aktualisieren",status:"OPEN",priority:"HIGH",dueDate:new Date("2026-08-20T00:00:00+02:00"),changeRequest:{id:"cr-1",number:"CR-2026-031",title:"Riemenspanner",status:"UNDER_REVIEW",machineType:{code:"CB1"}},...overrides});
+const machineTypes=[{machineType:{code:"CB1"}},{machineType:{code:"SV-2X"}}];
+const request=(overrides:Partial<RequestRef>={}):RequestRef=>({id:"cr-1",number:"CR-2026-031",title:"Riemenspanner",status:"UNDER_REVIEW",approvalCycle:2,finalReviewCycle:1,machineTypes,approvals:[{type:"AVOR",status:"PENDING",cycle:2},{type:"TECHNICAL",status:"PENDING",cycle:2}],finalApprovals:[],technicalReview:null,avorImpactReview:null,purchasingReview:null,...overrides});
+const task=(overrides:Partial<TaskRef>={}):TaskRef=>({id:"task-1",title:"Zeichnung aktualisieren",status:"OPEN",priority:"HIGH",dueDate:new Date("2026-08-20T00:00:00+02:00"),changeRequest:{id:"cr-1",number:"CR-2026-031",title:"Riemenspanner",status:"UNDER_REVIEW",machineTypes},...overrides});
 const inbox=(roles:("EMPLOYEE"|"AVOR"|"TECHNICAL"|"ADMINISTRATOR")[],requests:RequestRef[]=[request()],tasks:TaskRef[]=[])=>buildPersonalInbox({roles,requests,tasks,now:new Date("2026-08-21T12:00:00+02:00")});
 
 describe("Persönliche Arbeits-Inbox",()=>{
@@ -14,6 +15,7 @@ describe("Persönliche Arbeits-Inbox",()=>{
   it("zeigt die technische Abschlussfreigabe nur in der aktuellen Runde",()=>{const source=request({status:"FINAL_REVIEW",approvals:[{type:"TECHNICAL",status:"APPROVED",cycle:2}],technicalReview:{completed:true},finalReviewCycle:3,finalApprovals:[{type:"TECHNICAL",cycle:2}]});expect(inbox(["TECHNICAL"],[source]).map(i=>i.action)).toContain("Technische Abschlussfreigabe erforderlich")});
   it("zeigt Mitarbeitern nur zugewiesene offene Aufgaben",()=>{const items=inbox(["EMPLOYEE"],[request()],[task()]);expect(items).toHaveLength(1);expect(items[0]).toMatchObject({kind:"TASK",action:"Zeichnung aktualisieren",overdue:true});expect(inbox(["EMPLOYEE"],[],[task({status:"DONE"})])).toHaveLength(0)});
   it("kombiniert Dualrollen ohne doppelte Business-Aktionen",()=>{const items=inbox(["AVOR","TECHNICAL"]);expect(items.map(i=>i.action)).toEqual(expect.arrayContaining(["AVOR-Freigabe erforderlich","Technische Freigabe erforderlich"]));expect(new Set(items.map(i=>i.id)).size).toBe(items.length)});
+  it("zeigt alle Maschinentypen ohne Inbox-Aktionen zu duplizieren",()=>{const items=inbox(["AVOR"]);expect(items).toHaveLength(1);expect(items[0].machineTypes).toEqual(["CB1","SV-2X"])});
   it("zeigt Administratoren ohne explizite Fachrolle keinen globalen Workflow-Backlog",()=>expect(inbox(["ADMINISTRATOR"])).toHaveLength(0));
   it("unterdrückt alle Aktionen geschlossener Anträge",()=>{const closed=request({status:"CLOSED"});expect(inbox(["AVOR","TECHNICAL"],[closed],[task({changeRequest:{...task().changeRequest,status:"CLOSED"}})])).toHaveLength(0)});
   it("filtert Überfälligkeit ausschliesslich aus Aufgaben",()=>{const items=inbox(["AVOR"],[request()],[task()]);expect(filterInbox(items,"OVERDUE")).toHaveLength(1);expect(filterInbox(items,"OVERDUE")[0].kind).toBe("TASK")});

@@ -25,7 +25,7 @@ export default async function RequestsPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        machineType: true,
+        machineTypes: { include: { machineType: true }, orderBy: { machineType: { code: "asc" } } },
         applicant: true,
         reasons: { include: { changeReason: true } },
       },
@@ -140,7 +140,7 @@ export default async function RequestsPage({
                   <td className="px-4 py-3 font-medium">
                     {r.title || "Unbenannter Entwurf"}
                   </td>
-                  <td className="px-4 py-3">{r.machineType?.code ?? "–"}</td>
+                  <td className="px-4 py-3" title={r.machineTypes.map(({machineType})=>machineType.code).join(", ")}>{machineSummary(r.machineTypes.map(({machineType})=>machineType.code))}</td>
                   <td className="px-4 py-3">{r.applicantName || r.applicant.name}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={r.status as ChangeRequestStatusKey} />
@@ -170,7 +170,7 @@ export default async function RequestsPage({
             </tbody>
           </table>
         </div>
-        <div className="divide-y divide-slate-100 md:hidden">{rows.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block p-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-semibold text-slate-900">{r.title||"Unbenannter Entwurf"}</p><dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-slate-500">Maschinentyp</dt><dd>{r.machineType?.code??"–"}</dd></div><div><dt className="text-xs text-slate-500">Antragsteller</dt><dd>{r.applicantName||r.applicant.name}</dd></div><div className="col-span-2"><dt className="text-xs text-slate-500">Änderungsgrund</dt><dd>{r.reasons.map((x)=>x.changeReason.label).join(", ")||"–"}</dd></div></dl></Link>)}{!rows.length&&<p className="p-8 text-center text-sm text-slate-500">Keine Änderungsanträge gefunden.</p>}</div>
+        <div className="divide-y divide-slate-100 md:hidden">{rows.map((r)=><Link key={r.id} href={`/change-requests/${r.id}`} className="block p-4 hover:bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-mono text-sm font-semibold text-[#175f91]">{r.number}</p><StatusBadge status={r.status as ChangeRequestStatusKey}/></div><p className="mt-2 font-semibold text-slate-900">{r.title||"Unbenannter Entwurf"}</p><dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><div><dt className="text-xs text-slate-500">Maschinentypen</dt><dd className="flex flex-wrap gap-1">{r.machineTypes.length?r.machineTypes.map(({machineType})=><span key={machineType.id} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{machineType.code}</span>):"–"}</dd></div><div><dt className="text-xs text-slate-500">Antragsteller</dt><dd>{r.applicantName||r.applicant.name}</dd></div><div className="col-span-2"><dt className="text-xs text-slate-500">Änderungsgrund</dt><dd>{r.reasons.map((x)=>x.changeReason.label).join(", ")||"–"}</dd></div></dl></Link>)}{!rows.length&&<p className="p-8 text-center text-sm text-slate-500">Keine Änderungsanträge gefunden.</p>}</div>
       </Card>
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
         <Link
@@ -194,6 +194,7 @@ export default async function RequestsPage({
     </>
   );
 }
+function machineSummary(codes: string[]) { return codes.length <= 2 ? codes.join(", ") || "–" : `${codes[0]} +${codes.length - 1}`; }
 function Select({
   name,
   label,

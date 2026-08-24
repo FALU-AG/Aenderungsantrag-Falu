@@ -11,9 +11,9 @@ export default async function EditRequestPage({
   const { id } = await params;
   const user = await getCurrentUser();
   const [request, machines, reasons] = await Promise.all([
-    db.changeRequest.findUnique({ where: { id }, include: { reasons: true } }),
+    db.changeRequest.findUnique({ where: { id }, include: { reasons: true, machineTypes: true } }),
     db.machineType.findMany({
-      where: { OR: [{ active: true }, { requests: { some: { id } } }] },
+      where: { OR: [{ active: true }, { requests: { some: { changeRequestId: id } } }] },
       orderBy: { code: "asc" },
     }),
     db.changeReason.findMany({
@@ -43,7 +43,7 @@ export default async function EditRequestPage({
         description="Änderungen werden mit Versionsprüfung gespeichert."
       />
       <ChangeRequestForm
-        machineTypes={machines.map((m) => ({ id: m.id, label: m.code }))}
+        machineTypes={machines.map((m) => ({ id: m.id, label: m.code, active: m.active }))}
         reasons={reasons.map((r) => ({
           id: r.id,
           label: r.label,
@@ -57,7 +57,7 @@ export default async function EditRequestPage({
           createdAt: new Intl.DateTimeFormat("de-CH").format(request.createdAt),
           applicantName: request.applicantName,
           title: request.title,
-          machineTypeId: request.machineTypeId ?? "",
+          machineTypeIds: request.machineTypes.map(({ machineTypeId }) => machineTypeId),
           articleNumber: request.articleNumber ?? "",
           articleDescription: request.articleDescription ?? "",
           reasonIds: request.reasons.map((r) => r.changeReasonId),
