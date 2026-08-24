@@ -11,10 +11,17 @@ import { loadPersonalInbox } from "@/modules/inbox/query";
 import { MobileNavigation, type NavigationItem } from "./mobile-navigation";
 
 const navigation = [
-  { href: "/", label: "Dashboard", icon: Gauge },
-  { href: "/change-requests", label: "Änderungsanträge", icon: ClipboardList },
-  { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: ListTodo },
-];
+  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/change-requests", label: "Änderungsanträge", icon: "change-requests" },
+  { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: "tasks" },
+] satisfies NavigationItem[];
+
+const navigationIcons = {
+  dashboard: Gauge,
+  "change-requests": ClipboardList,
+  tasks: ListTodo,
+  administration: Settings,
+} satisfies Record<NavigationItem["icon"], typeof Gauge>;
 
 export async function AppShell({
   user,
@@ -24,7 +31,7 @@ export async function AppShell({
   children: React.ReactNode;
 }) {
   const inboxCount = (await loadPersonalInbox(user)).length;
-  const items: NavigationItem[] = [...navigation.map((item) => ({...item, count: item.href === "/meine-aufgaben" ? inboxCount : undefined})), ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/users", label: "Administration", icon: Settings }] : [])];
+  const items: NavigationItem[] = [...navigation.map((item) => ({...item, count: item.href === "/meine-aufgaben" ? inboxCount : undefined})), ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/users", label: "Administration", icon: "administration" as const }] : [])];
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
@@ -68,7 +75,9 @@ export async function AppShell({
             className="flex gap-2 overflow-x-auto lg:flex-col"
             aria-label="Hauptnavigation"
           >
-            {items.map(({ href, label, icon: Icon, count }) => (
+            {items.map(({ href, label, icon, count }) => {
+              const Icon = navigationIcons[icon];
+              return (
               <Link
                 key={href}
                 href={href}
@@ -82,7 +91,8 @@ export async function AppShell({
                   </span>
                 )}
               </Link>
-            ))}
+              );
+            })}
           </nav>
         </aside>
         <main className="min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8 xl:px-10">{children}</main>
