@@ -11,6 +11,9 @@ describe("Seed-Annahmen", () => {
   it("stellt nur die korrigierten Maschinentypen für neue Anträge bereit", () => {
     const active = MACHINE_TYPES.filter((item) => item.active).map((item) => item.code);
     expect(active).toContain("SQB-2AT");
+    expect(active).toEqual(expect.arrayContaining(["WR-2100 S", "WR-600 V", "VP-2"]));
+    for (const code of ["WR-2100 S", "WR-600 V", "VP-2"])
+      expect(MACHINE_TYPES.find((item) => item.code === code)).toEqual({ code, name: code, active: true });
     expect(active).not.toEqual(expect.arrayContaining(["BLS-12", "SQB-2A", "SQB-AT", "SQT-AT"]));
     expect(MACHINE_TYPES.find((item) => item.code === "SQB-AT")?.active).toBe(false);
     expect(MACHINE_TYPES.find((item) => item.code === "SQT-AT")?.active).toBe(false);

@@ -13,6 +13,8 @@ import {
   TASK_STATUS_LABELS,
   type TaskStatusKey,
 } from "./domain";
+import { queueTaskAssignmentNotification } from "@/modules/notifications/workflow";
+import { sendNotifications } from "@/modules/notifications/service";
 export type TaskActionState = {
   errors?: Record<string, string[]>;
   message?: string;
@@ -61,6 +63,7 @@ export async function createTask(
       message:
         "Die verantwortliche Person ist nicht aktiv oder existiert nicht.",
     };
+  let notificationIds: string[] = [];
   await db.$transaction(async (tx) => {
     const task = await tx.task.create({
       data: {
@@ -85,7 +88,9 @@ export async function createTask(
           entityId: task.id,
         },
       });
+    notificationIds = await queueTaskAssignmentNotification(tx, task.id, `created:${task.createdAt.toISOString()}`);
   });
+  await sendNotifications(notificationIds);
   refresh(requestId);
   return { success: "Aufgabe erstellt." };
 }
@@ -98,6 +103,7 @@ export async function updateTask(
   requirePermission(user, "TASK_UPDATE");
   const parsed = taskSchema.safeParse(input(f));
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors };
+  let notificationIds: string[] = [];
   await db.$transaction(async (tx) => {
     const old = await tx.task.findUniqueOrThrow({
       where: { id: taskId },
@@ -186,7 +192,9 @@ export async function updateTask(
           },
         },
       });
+    if (old.responsibleUserId !== task.responsibleUserId) notificationIds = await queueTaskAssignmentNotification(tx, task.id, `assigned:${task.updatedAt.toISOString()}`);
   });
+  await sendNotifications(notificationIds);
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
     select: { changeRequestId: true },

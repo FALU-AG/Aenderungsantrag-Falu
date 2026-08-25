@@ -7,7 +7,7 @@ vi.mock("@/modules/assist/actions", () => ({ formulateText: vi.fn(), transcribeS
 import { ChangeRequestForm } from "./change-request-form";
 
 afterEach(cleanup);
-const props = { machineTypes: [{ id: "m1", label: "SQB-2AT", active: true }, { id: "m2", label: "CB1", active: true }], reasons: [{ id: "r1", label: "Kundenwunsch" }] };
+const props = { machineTypes: [{ id: "m1", label: "SQB-2AT", active: true }, { id: "m2", label: "CB1", active: true }, { id: "m3", label: "WR-2100 S", active: true }, { id: "m4", label: "WR-600 V", active: true }, { id: "m5", label: "VP-2", active: true }], reasons: [{ id: "r1", label: "Kundenwunsch" }] };
 
 describe("ChangeRequestForm UX", () => {
   it("befüllt den Antragsteller mit dem angemeldeten Benutzer und lässt ihn änderbar", async () => {
@@ -47,8 +47,14 @@ describe("ChangeRequestForm UX", () => {
     await user.click(screen.getByRole("button", { name: /Maschine auswählen/ }));
     await user.click(screen.getByRole("button", { name: "SQB-2AT" }));
     await user.click(screen.getByRole("button", { name: "CB1" }));
+    await user.click(screen.getByRole("button", { name: "WR-2100 S" }));
+    await user.click(screen.getByRole("button", { name: "WR-600 V" }));
+    await user.click(screen.getByRole("button", { name: "VP-2" }));
     expect(screen.getByRole("button", { name: "SQB-2AT entfernen" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "CB1 entfernen" })).toBeInTheDocument();
-    expect(document.querySelectorAll('input[name="machineTypeIds"]')).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "WR-2100 S entfernen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "WR-600 V entfernen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "VP-2 entfernen" })).toBeInTheDocument();
+    expect(document.querySelectorAll('input[name="machineTypeIds"]')).toHaveLength(5);
   });
 });

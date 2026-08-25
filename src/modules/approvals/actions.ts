@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
 import { approvalAuditSummary, approvalDecisionSchema, canDecideApproval, resultingRequestStatus, shouldTransition, type ApprovalTypeKey } from "./domain";
+import { queueRequestNotification } from "@/modules/notifications/workflow";
+import { sendNotifications } from "@/modules/notifications/service";
 
 export type ApprovalActionState = { error?: string; success?: boolean };
 
@@ -13,6 +15,7 @@ export async function decideApproval(requestId: string, type: ApprovalTypeKey, _
   const parsed = approvalDecisionSchema.safeParse({ decision: formData.get("decision"), comment: String(formData.get("comment") ?? "") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   try {
+    let notificationIds: string[] = [];
     await db.$transaction(async (tx) => {
       const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: requestId }, select: { status: true, approvalCycle: true } });
       if (request.status !== "UNDER_REVIEW") throw new Error("Der Antrag befindet sich nicht mehr in Prüfung.");
@@ -24,9 +27,13 @@ export async function decideApproval(requestId: string, type: ApprovalTypeKey, _
       const nextStatus = resultingRequestStatus(current.map((item) => item.status));
       if (shouldTransition(request.status,nextStatus)) {
         const transitioned = await tx.changeRequest.updateMany({ where: { id: requestId, status: "UNDER_REVIEW", approvalCycle: request.approvalCycle }, data: { status: nextStatus, version: { increment: 1 } } });
-        if (transitioned.count === 1) await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: "STATUS_TRANSITIONED", entityType: "ChangeRequest", entityId: requestId, summary: nextStatus === "APPROVED_FOR_IMPLEMENTATION" ? "Der Änderungsantrag wurde automatisch zur Umsetzung freigegeben." : "Der Änderungsantrag wurde automatisch zur Überarbeitung zurückgegeben.", details: { from: "UNDER_REVIEW", to: nextStatus, cycle: request.approvalCycle } } });
+        if (transitioned.count === 1) {
+          await tx.auditEvent.create({ data: { changeRequestId: requestId, userId: user.id, action: "STATUS_TRANSITIONED", entityType: "ChangeRequest", entityId: requestId, summary: nextStatus === "APPROVED_FOR_IMPLEMENTATION" ? "Der Änderungsantrag wurde automatisch zur Umsetzung freigegeben." : "Der Änderungsantrag wurde automatisch zur Überarbeitung zurückgegeben.", details: { from: "UNDER_REVIEW", to: nextStatus, cycle: request.approvalCycle } } });
+          notificationIds = await queueRequestNotification(tx, requestId, nextStatus === "APPROVED_FOR_IMPLEMENTATION" ? "REQUEST_APPROVED" : "REQUEST_CHANGES_REQUIRED", `approval-result:${requestId}:${request.approvalCycle}`, nextStatus === "CHANGES_REQUESTED" ? `${type === "AVOR" ? "AVOR" : "Technik"}: ${parsed.data.comment}` : undefined);
+        }
       }
     }, { isolationLevel: "Serializable" });
+    await sendNotifications(notificationIds);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Die Freigabe konnte nicht gespeichert werden." };
   }

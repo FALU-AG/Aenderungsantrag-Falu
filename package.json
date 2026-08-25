@@ -22,7 +22,8 @@
     "db:create-admin": "tsx scripts/create-admin.ts",
     "db:cleanup-demo": "tsx scripts/cleanup-demo-data.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
-    "storage:check": "tsx scripts/check-storage.ts"
+    "storage:check": "tsx scripts/check-storage.ts",
+    "notifications:retry": "tsx scripts/retry-notifications.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -43,6 +44,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.85.0",
+    "resend": "^6.22.1",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { ForgotPasswordForm } from "@/components/forgot-password-form";
+export default function ForgotPasswordPage() { return <main className="grid min-h-screen place-items-center bg-slate-100 p-5"><section className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm"><h1 className="text-xl font-semibold">Passwort zurücksetzen</h1><p className="mt-2 text-sm text-slate-600">Wir senden Ihnen einen einmalig verwendbaren Link.</p><ForgotPasswordForm /><Link href="/login" className="mt-6 inline-block text-sm text-[#175f91] hover:underline">Zur Anmeldung</Link></section></main>; }

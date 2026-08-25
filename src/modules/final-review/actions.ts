@@ -15,6 +15,8 @@ import {
   reasonSchema,
   type FinalApprovalType,
 } from "./domain";
+import { queueRequestNotification } from "@/modules/notifications/workflow";
+import { sendNotifications } from "@/modules/notifications/service";
 export type FinalReviewActionState = { message?: string; success?: string };
 const refresh = (id: string) => {
   revalidatePath("/");
@@ -113,6 +115,7 @@ export async function grantFinalApproval(
   });
   if (!parsed.success) return { message: parsed.error.issues[0].message };
   try {
+    let notificationIds: string[] = [];
     const closed = await serializable(async (tx) => {
       const { request, state } = await closureState(tx, requestId);
       if (request.status !== "FINAL_REVIEW")
@@ -178,8 +181,10 @@ export async function grantFinalApproval(
           details: { cycle: request.finalReviewCycle, triggeredBy: user.id },
         },
       });
+      notificationIds = await queueRequestNotification(tx, requestId, "REQUEST_CLOSED", `closed:${requestId}:${request.finalReviewCycle}`);
       return true;
     });
+    await sendNotifications(notificationIds);
     refresh(requestId);
     return {
       success: closed

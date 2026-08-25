@@ -4,6 +4,7 @@ import { db } from "@/server/db/client";
 import { createSession, invalidateCurrentSession, invalidateUserSessions } from "./session";
 import { getCurrentUser } from ".";
 import { hashPassword, validateNewPassword, verifyPassword } from "./password";
+import { consumePasswordReset, requestPasswordReset } from "./password-reset";
 export type LoginState = { errors?: { email?: string; password?: string }; message?: string };
 export async function login(_: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -19,6 +20,23 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   redirect(user.mustChangePassword ? "/change-password" : "/");
 }
 export async function logout() { await invalidateCurrentSession(); redirect("/login"); }
+export type ForgotPasswordState = { sent?: boolean };
+export async function forgotPassword(_: ForgotPasswordState, formData: FormData): Promise<ForgotPasswordState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (email) await requestPasswordReset(email).catch(() => undefined);
+  return { sent: true };
+}
+export type ResetPasswordState = { error?: string };
+export async function resetPassword(_: ResetPasswordState, formData: FormData): Promise<ResetPasswordState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirmation = String(formData.get("passwordConfirmation") ?? "");
+  const errors = validateNewPassword(password, confirmation);
+  if (errors.password) return { error: errors.password };
+  if (errors.passwordConfirmation) return { error: errors.passwordConfirmation };
+  if (!token || !(await consumePasswordReset(token, password))) return { error: "Der Link ist ungültig oder abgelaufen. Fordern Sie bitte einen neuen Link an." };
+  redirect("/login?passwordReset=success");
+}
 export type ChangePasswordState = { errors?: { password?: string; passwordConfirmation?: string } };
 export async function changeOwnPassword(_: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
   const user = await getCurrentUser(); const password = String(formData.get("password") ?? ""); const confirmation = String(formData.get("passwordConfirmation") ?? "");

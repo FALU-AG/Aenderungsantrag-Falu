@@ -125,6 +125,39 @@ Antragsnummern werden beim ersten Speichern serverseitig über einen jährlichen
 
 Im Tab `Freigaben` entscheiden AVOR und Technik unabhängig voneinander. Entscheidungen sind unveränderlich, rollenbasiert geschützt und werden gemeinsam mit automatischen Statusübergängen und Audit-Ereignissen transaktional gespeichert. Eine Ablehnung führt zu `Änderung erforderlich`; nach der Überarbeitung erzeugt die erneute Einreichung eine neue Freigaberunde, während frühere Runden vollständig lesbar bleiben.
 
+## E-Mail-Benachrichtigungen und Passwort-Wiederherstellung
+
+E-Mails laufen zentral über eine transaktionale `EmailNotification`-Outbox und den serverseitigen Resend-Provider. Geschäftsdaten werden zuerst committed; Providerfehler werden danach in der Outbox erfasst und verändern den erfolgreichen Workflow nicht. Wiederholungen sind durch fachliche Idempotenzschlüssel und zusätzlich durch den Resend-Idempotency-Key geschützt. Fehlgeschlagene, nicht sicherheitskritische Nachrichten können begrenzt wiederholt werden:
+
+```bash
+npm run notifications:retry
+```
+
+Passwort-Reset-Links verwenden kryptografisch zufällige, einmalige Tokens mit 30 Minuten Gültigkeit. PostgreSQL speichert ausschließlich deren SHA-256-Hash; nach erfolgreichem Reset werden alle Sessions invalidiert. Roh-Tokens stehen weder in der Outbox noch in Logs. Das bestehende temporäre Admin-Passwort bleibt vorerst erhalten; `USER_INVITATION` ist als Ereignistyp und Templatepfad vorbereitet, ohne Klartextpasswörter per E-Mail zu versenden.
+
+Erforderliche Railway-Variablen:
+
+```env
+RESEND_API_KEY="..."
+RESEND_WEBHOOK_SECRET="..."
+EMAIL_FROM="FALU Change Request <change-request@bestätigte-domain>"
+EMAIL_MODE="redirect"
+EMAIL_REDIRECT_TO="kontrolliertes-testpostfach@..."
+APP_BASE_URL="https://aenderungsantrag-falu-production.up.railway.app"
+```
+
+`EMAIL_MODE` muss explizit `disabled`, `redirect` oder `live` sein. Lokal ist `disabled` sicher voreingestellt; `redirect` leitet alle Empfänger an `EMAIL_REDIRECT_TO` um. Den Versand erst nach verifizierter Domain (einschliesslich der von Resend gelieferten SPF-/DKIM-DNS-Einträge) auf `live` stellen. Der Resend-Webhook zeigt auf `/api/webhooks/resend` und wird mit `RESEND_WEBHOOK_SECRET` signaturgeprüft.
+
+Sicherer Produktions-Rollout:
+
+1. Sender-Domain in Resend verifizieren und SPF/DKIM einrichten.
+2. Railway-Variablen setzen, zunächst `EMAIL_MODE=redirect` mit kontrolliertem Testpostfach.
+3. Deploy inklusive `npx prisma migrate deploy` ausführen.
+4. Passwort-Reset, AVOR-/Technik-Freigabe, Aufgabenzuweisung, Ablehnung und Abschluss testen.
+5. `EmailNotification`-Datensätze und sichere Fehlertexte prüfen.
+6. Resend-Webhook konfigurieren und Zustände `sent`, `delivered`, `bounced` und `complained` prüfen.
+7. Erst danach `EMAIL_MODE=live` setzen.
+
 ## Phase-4-Technische-Prüfung
 
 Nach der Freigabe dokumentiert die Technik Sicherheit, Austauschbarkeit, Auswirkungen, bestehende Artikel, nächste Schritte und Dokumentationsstände. Teilstände können gespeichert und später abgeschlossen werden. Abgeschlossene Prüfungen sind gesperrt und können von Technik oder Administration nur mit protokollierter Begründung erneut geöffnet werden.

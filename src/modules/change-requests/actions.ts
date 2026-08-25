@@ -18,6 +18,8 @@ import { requireDraftEdit } from "./authorization";
 import { cleanupUploadedAttachment, removeStoredAttachment, supabaseObjectKey, uploadNewAttachment } from "@/server/storage/attachment-storage";
 import { submissionData } from "./submission";
 import { machineTypeChangeSummary } from "./machine-type-change";
+import { queueApprovalCycleNotifications } from "@/modules/notifications/workflow";
+import { sendNotifications } from "@/modules/notifications/service";
 
 export type FormState = { errors?: Record<string, string[]>; message?: string };
 const errorsOf = (error: {
@@ -68,6 +70,7 @@ export async function saveChangeRequest(
   if (parsed.data.machineTypeIds.some((machineId) => !allowedMachineTypeIds.has(machineId)))
     return { errors: { machineTypeIds: ["Ein ausgewählter Maschinentyp ist nicht aktiv oder unbekannt."] } };
   let requestId = id;
+  let notificationIds: string[] = [];
 
   await db.$transaction(async (tx) => {
     if (id) {
@@ -235,6 +238,7 @@ export async function saveChangeRequest(
           ...approval,
         })),
       });
+      notificationIds = await queueApprovalCycleNotifications(tx, requestId, cycle);
       const resubmitted = cycle > 1;
       await tx.auditEvent.create({
         data: {
@@ -265,6 +269,7 @@ export async function saveChangeRequest(
         });
     }
   });
+  await sendNotifications(notificationIds);
 
   const files = formData
     .getAll("attachments")
@@ -397,6 +402,7 @@ export async function submitExistingRequest(requestId: string) {
       ? request.approvalCycle + 1
       : request.approvalCycle;
   const submission = submissionData(new Date(), cycle);
+  let notificationIds: string[] = [];
   await db.$transaction(async (tx) => {
     const updated = await tx.changeRequest.updateMany({
       where: {
@@ -420,6 +426,7 @@ export async function submitExistingRequest(requestId: string) {
         ...approval,
       })),
     });
+    notificationIds = await queueApprovalCycleNotifications(tx, requestId, cycle);
     const resubmitted = cycle > 1;
     await tx.auditEvent.create({
       data: {
@@ -449,6 +456,7 @@ export async function submitExistingRequest(requestId: string) {
         },
       });
   });
+  await sendNotifications(notificationIds);
   revalidatePath("/");
   revalidatePath("/change-requests");
   redirect(`/change-requests/${requestId}`);
