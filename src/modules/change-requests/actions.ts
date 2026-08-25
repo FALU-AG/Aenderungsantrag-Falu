@@ -20,8 +20,10 @@ import { submissionData } from "./submission";
 import { machineTypeChangeSummary } from "./machine-type-change";
 import { queueApprovalCycleNotifications } from "@/modules/notifications/workflow";
 import { sendNotifications } from "@/modules/notifications/service";
+import { permanentlyDeleteChangeRequest } from "./delete-change-request";
 
 export type FormState = { errors?: Record<string, string[]>; message?: string };
+export type DeleteChangeRequestState = { error?: string };
 const errorsOf = (error: {
   flatten(): { fieldErrors: Record<string, string[]> };
 }): FormState => ({ errors: error.flatten().fieldErrors });
@@ -460,4 +462,17 @@ export async function submitExistingRequest(requestId: string) {
   revalidatePath("/");
   revalidatePath("/change-requests");
   redirect(`/change-requests/${requestId}`);
+}
+
+export async function deleteChangeRequest(requestId: string, _state: DeleteChangeRequestState): Promise<DeleteChangeRequestState> {
+  void _state;
+  try {
+    const actor = await getCurrentUser();
+    await permanentlyDeleteChangeRequest(db, actor, requestId);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Der Änderungsantrag konnte nicht gelöscht werden." };
+  }
+  revalidatePath("/");
+  revalidatePath("/change-requests");
+  redirect("/change-requests");
 }

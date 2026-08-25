@@ -60,6 +60,8 @@ import {
   closurePrerequisites,
 } from "@/modules/final-review/domain";
 import { formatDateTimeZurich } from "@/lib/date-time";
+import { canDeleteChangeRequest } from "@/modules/change-requests/authorization";
+import { DeleteChangeRequestAction } from "@/components/delete-change-request-action";
 
 const tabs = [
   "Übersicht",
@@ -128,6 +130,7 @@ export default async function RequestDetailPage({
     select: { id: true, name: true },
   });
   const editable = canEditDraft(user, request);
+  const deletable = canDeleteChangeRequest(user, request.approvals);
   const current = request.approvals.filter(
     (a) => a.cycle === request.approvalCycle,
   );
@@ -168,9 +171,9 @@ export default async function RequestDetailPage({
             {formatDate(request.updatedAt)}
           </p>
         </div>
-        {editable && (
+        {(editable || deletable) && (
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-            <Link
+            {editable && <><Link
               href={`/change-requests/${id}/edit`}
               className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border bg-white px-4 py-2.5 text-sm font-semibold sm:flex-none"
             >
@@ -185,7 +188,8 @@ export default async function RequestDetailPage({
                   ? "Erneut einreichen"
                   : "Einreichen"}
               </button>
-            </form>
+            </form></>}
+            {deletable && <DeleteChangeRequestAction requestId={id} requestNumber={request.number} />}
           </div>
         )}
       </div>
