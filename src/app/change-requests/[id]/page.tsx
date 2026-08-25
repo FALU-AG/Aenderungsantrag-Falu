@@ -59,6 +59,7 @@ import {
   canRequestFinalChanges,
   closurePrerequisites,
 } from "@/modules/final-review/domain";
+import { formatDateTimeZurich } from "@/lib/date-time";
 
 const tabs = [
   "Übersicht",
@@ -72,12 +73,7 @@ const tabs = [
   "Kommentare",
   "Historie",
 ];
-const formatDate = (date: Date) =>
-  new Intl.DateTimeFormat("de-CH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Europe/Zurich",
-  }).format(date);
+const formatDate = formatDateTimeZurich;
 type ApprovalView = {
   id: string;
   type: ApprovalTypeKey;

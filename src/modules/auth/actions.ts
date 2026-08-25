@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/server/db/client";
 import { createSession, invalidateCurrentSession, invalidateUserSessions } from "./session";
 import { getCurrentUser } from ".";
-import { hashPassword, passwordError, validatePassword, verifyPassword } from "./password";
+import { hashPassword, validateNewPassword, verifyPassword } from "./password";
 export type LoginState = { errors?: { email?: string; password?: string }; message?: string };
 export async function login(_: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -19,9 +19,11 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   redirect(user.mustChangePassword ? "/change-password" : "/");
 }
 export async function logout() { await invalidateCurrentSession(); redirect("/login"); }
-export async function changeOwnPassword(_: { error?: string }, formData: FormData) {
-  const user = await getCurrentUser(); const password = String(formData.get("password") ?? "");
-  if (!validatePassword(password)) return { error: passwordError };
+export type ChangePasswordState = { errors?: { password?: string; passwordConfirmation?: string } };
+export async function changeOwnPassword(_: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
+  const user = await getCurrentUser(); const password = String(formData.get("password") ?? ""); const confirmation = String(formData.get("passwordConfirmation") ?? "");
+  const errors = validateNewPassword(password, confirmation);
+  if (Object.keys(errors).length) return { errors };
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), mustChangePassword: false } });
   await invalidateUserSessions(user.id); await createSession(user.id); redirect("/");
 }

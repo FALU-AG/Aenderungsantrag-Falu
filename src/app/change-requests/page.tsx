@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { buildRequestListQuery } from "@/modules/change-requests/list-query";
 import { getCurrentUser } from "@/modules/auth";
+import { formatDateZurich } from "@/lib/date-time";
 import {
   CHANGE_REQUEST_STATUSES,
   STATUS_LABELS,
@@ -150,10 +151,10 @@ export default async function RequestsPage({
                       "–"}
                   </td>
                   <td className="px-4 py-3">
-                    {r.createdAt.toLocaleDateString("de-CH")}
+                    {formatDateZurich(r.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    {r.updatedAt.toLocaleDateString("de-CH")}
+                    {formatDateZurich(r.updatedAt)}
                   </td>
                 </tr>
               ))}

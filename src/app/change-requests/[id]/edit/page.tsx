@@ -4,6 +4,7 @@ import { ChangeRequestForm } from "@/components/change-request-form";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
 import { requireDraftEdit } from "@/modules/change-requests/authorization";
+import { formatDateZurich } from "@/lib/date-time";
 
 export default async function EditRequestPage({
   params,
@@ -54,7 +55,7 @@ export default async function EditRequestPage({
           id: request.id,
           version: request.version,
           number: request.number,
-          createdAt: new Intl.DateTimeFormat("de-CH").format(request.createdAt),
+          createdAt: formatDateZurich(request.createdAt),
           applicantName: request.applicantName,
           title: request.title,
           machineTypeIds: request.machineTypes.map(({ machineTypeId }) => machineTypeId),

@@ -25,5 +25,6 @@ describe("Benutzerverwaltung", () => {
     expect(screen.getByRole("button", { name: "Benutzer kann nicht gelöscht werden" })).toBeDisabled();
     expect(screen.getByText("Dieser Benutzer kann nicht gelöscht werden, da geschäftliche Aktivitäten mit ihm verknüpft sind.")).toBeInTheDocument();
     expect(screen.getByText("Erstellte Änderungsanträge: 1")).toBeInTheDocument();
+    expect(screen.getByText("20.08.2026, 10:23")).toBeInTheDocument();
   });
 });

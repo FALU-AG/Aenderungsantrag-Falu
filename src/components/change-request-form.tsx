@@ -10,6 +10,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { AssistedTextField } from "@/components/assisted-text-field";
 import { AttachmentPicker } from "@/components/attachment-picker";
+import { formatDateZurich } from "@/lib/date-time";
 
 type Option = {
   id: string;
@@ -98,7 +99,7 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
             label="Datum"
             value={
               initial?.createdAt ??
-              new Intl.DateTimeFormat("de-CH").format(new Date())
+              formatDateZurich(new Date())
             }
           />
           <div className="md:col-span-2">
