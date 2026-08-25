@@ -22,7 +22,7 @@ export async function requestPasswordReset(email: string) {
   const id = await db.$transaction(async (tx) => {
     await tx.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
     const reset = await tx.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60_000) } });
-    const notification = await queueNotification(tx, { type: "PASSWORD_RESET", idempotencyKey: `password-reset:${reset.id}`, recipientUserId: user.id, recipientEmail: user.email, recipientName: user.name, subject: "Passwort für FALU Change Request zurücksetzen", templateData: {} });
+    const notification = await queueNotification(tx, { type: "PASSWORD_RESET", idempotencyKey: `password-reset:${reset.id}`, recipientUserId: user.id, recipientEmail: user.email, recipientName: user.name, subject: "Passwort zurücksetzen | FALU Change Request", templateData: {} });
     return notification.id;
   });
   const base = process.env.APP_BASE_URL;

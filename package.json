@@ -21,6 +21,7 @@
     "db:list-admins": "tsx scripts/list-admins.ts",
     "db:create-admin": "tsx scripts/create-admin.ts",
     "db:cleanup-demo": "tsx scripts/cleanup-demo-data.ts",
+    "db:delete-test-requests": "tsx scripts/delete-test-change-requests.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
     "storage:check": "tsx scripts/check-storage.ts",
     "notifications:retry": "tsx scripts/retry-notifications.ts"
