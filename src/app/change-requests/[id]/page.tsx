@@ -228,6 +228,7 @@ export default async function RequestDetailPage({
           previousCycles={previousCycles}
           all={request.approvals}
           user={user}
+          requestStatus={request.status}
         />
       ) : tab === "Technische Prüfung" ? (
         <TechnicalReviewForm
@@ -887,6 +888,7 @@ function Approvals({
   previousCycles,
   all,
   user,
+  requestStatus,
 }: {
   requestId: string;
   cycle: number;
@@ -894,6 +896,7 @@ function Approvals({
   previousCycles: number[];
   all: ApprovalView[];
   user: Parameters<typeof canDecideApproval>[0];
+  requestStatus: string;
 }) {
   return (
     <div className="space-y-6">
@@ -911,6 +914,8 @@ function Approvals({
                 type={type}
                 status={a.status}
                 cycle={a.cycle}
+                currentCycle={cycle}
+                requestStatus={requestStatus}
                 decisionUser={a.decisionUser?.name}
                 decidedAt={a.decidedAt ? formatDate(a.decidedAt) : null}
                 comment={a.comment}

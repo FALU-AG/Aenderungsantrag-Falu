@@ -128,6 +128,13 @@ describe("Antragsaufnahme", () => {
     expect(result.where).toMatchObject({ status: "DRAFT" });
     expect(result.orderBy).toEqual({ title: "asc" });
   });
+  it("erstellt bei Wiedereinreichung zwei neue offene Freigaben im nächsten Zyklus", () => {
+    const data = submissionData(new Date("2026-08-25T08:00:00Z"), 3);
+    expect(data.approvals).toEqual([
+      { type: "AVOR", status: "PENDING", cycle: 3 },
+      { type: "TECHNICAL", status: "PENDING", cycle: 3 },
+    ]);
+  });
   it("filtert und sucht über jede verknüpfte Maschine", () => {
     expect(buildRequestListQuery({ machineTypeId: "m2" }).where).toMatchObject({ machineTypes: { some: { machineTypeId: "m2" } } });
     expect(buildRequestListQuery({ q: "SV-2X" }).where.OR).toContainEqual({ machineTypes: { some: { machineType: { code: { contains: "SV-2X", mode: "insensitive" } } } } });

@@ -11,6 +11,10 @@ export function canDecideApproval(user: Pick<AuthUser, "roles">, type: ApprovalT
   return user.roles.includes("ADMINISTRATOR") || user.roles.includes(required);
 }
 
+export function approvalActionAvailable({ canDecide, approvalStatus, requestStatus, approvalCycle, currentCycle }: { canDecide: boolean; approvalStatus: ApprovalStatusKey; requestStatus: string; approvalCycle: number; currentCycle: number }) {
+  return canDecide && approvalStatus === "PENDING" && requestStatus === "UNDER_REVIEW" && approvalCycle === currentCycle;
+}
+
 export const approvalDecisionSchema = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
   comment: z.string().trim().max(2_000, "Der Kommentar darf höchstens 2'000 Zeichen enthalten."),
