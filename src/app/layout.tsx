@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { getCurrentUser } from "@/modules/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { isPublicAuthPath } from "@/modules/auth/public-routes";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = (await headers()).get("x-falu-pathname") ?? "/";
-  const user = pathname === "/login" ? null : await getCurrentUser();
+  const user = isPublicAuthPath(pathname) ? null : await getCurrentUser();
   if (user?.mustChangePassword && pathname !== "/change-password") redirect("/change-password");
   return (
     <html lang="de" className={`${geistSans.variable} h-full antialiased`}>

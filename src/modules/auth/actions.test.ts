@@ -5,13 +5,15 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(), userUpdate: vi.fn(), transaction: vi.fn(),
   getCurrentUser: vi.fn(async () => ({ id: "user-1", name: "Test", email: "test@falu.ch", roles: ["EMPLOYEE"] })),
   createSession: vi.fn(), invalidateCurrentSession: vi.fn(), invalidateUserSessions: vi.fn(), redirect: vi.fn(() => { throw new Error("NEXT_REDIRECT"); }),
+  consumePasswordReset: vi.fn(), requestPasswordReset: vi.fn(),
 }));
 vi.mock("@/server/db/client", () => ({ db: { user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate }, session: { deleteMany: vi.fn() }, $transaction: mocks.transaction } }));
 vi.mock(".", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("./session", () => ({ createSession: mocks.createSession, invalidateCurrentSession: mocks.invalidateCurrentSession, invalidateUserSessions: mocks.invalidateUserSessions }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("./password-reset", () => ({ consumePasswordReset: mocks.consumePasswordReset, requestPasswordReset: mocks.requestPasswordReset }));
 
-import { changeOwnPassword, login } from "./actions";
+import { changeOwnPassword, login, resetPassword } from "./actions";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -42,5 +44,13 @@ describe("Passwortaktionen", () => {
     await expect(login({}, form)).rejects.toThrow("NEXT_REDIRECT");
     expect(mocks.userFindUnique).toHaveBeenCalledWith({ where: { email: "test@falu.ch" } });
     expect(mocks.createSession).toHaveBeenCalledWith("user-1");
+  });
+
+  it("leitet nach erfolgreichem öffentlichem Reset mit Erfolgsmeldung zur Anmeldung", async () => {
+    mocks.consumePasswordReset.mockResolvedValue(true);
+    const form = new FormData(); form.set("token", "valid-token"); form.set("password", "SicheresPasswort1!"); form.set("passwordConfirmation", "SicheresPasswort1!");
+    await expect(resetPassword({}, form)).rejects.toThrow("NEXT_REDIRECT");
+    expect(mocks.consumePasswordReset).toHaveBeenCalledWith("valid-token", "SicheresPasswort1!");
+    expect(mocks.redirect).toHaveBeenCalledWith("/login?passwordReset=success");
   });
 });

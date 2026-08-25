@@ -8,6 +8,12 @@ import { sendNotification } from "@/modules/notifications/service";
 
 export const hashResetToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
+export async function isPasswordResetTokenUsable(token: string) {
+  if (!token) return false;
+  const reset = await db.passwordResetToken.findUnique({ where: { tokenHash: hashResetToken(token) }, select: { usedAt: true, expiresAt: true, user: { select: { active: true } } } });
+  return Boolean(reset?.user.active && !reset.usedAt && reset.expiresAt > new Date());
+}
+
 export async function requestPasswordReset(email: string) {
   const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() }, select: { id: true, email: true, name: true, active: true } });
   if (!user?.active) return;
