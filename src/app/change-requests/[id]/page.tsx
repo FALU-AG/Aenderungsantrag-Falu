@@ -15,6 +15,7 @@ import { PurchasingReviewForm } from "@/components/purchasing-review-form";
 import { TaskManagement } from "@/components/task-management";
 import { FinalReviewPanel } from "@/components/final-review-panel";
 import { AttachmentUploadForm } from "@/components/attachment-upload-form";
+import { AttachmentOverviewCard } from "@/components/attachment-overview-card";
 import { canEditDraft } from "@/modules/change-requests/authorization";
 import {
   removeAttachment,
@@ -212,6 +213,12 @@ export default async function RequestDetailPage({
             current={current}
             rejectionComments={rejectionComments}
           />
+          <div className="mt-5">
+            <AttachmentOverviewCard
+              requestId={id}
+              attachments={request.attachments}
+            />
+          </div>
           <div className="mt-5 space-y-5">
             <TechnicalSummary review={request.technicalReview} />
             <AvorSummary review={request.avorImpactReview} />
