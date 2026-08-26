@@ -14,12 +14,11 @@ import { AvorReviewForm } from "@/components/avor-review-form";
 import { PurchasingReviewForm } from "@/components/purchasing-review-form";
 import { TaskManagement } from "@/components/task-management";
 import { FinalReviewPanel } from "@/components/final-review-panel";
-import { AttachmentPicker } from "@/components/attachment-picker";
+import { AttachmentUploadForm } from "@/components/attachment-upload-form";
 import { canEditDraft } from "@/modules/change-requests/authorization";
 import {
   removeAttachment,
   submitExistingRequest,
-  uploadAttachment,
 } from "@/modules/change-requests/actions";
 import {
   APPROVAL_LABELS,
@@ -985,15 +984,7 @@ function Attachments({
     <Card className="p-6">
       <h2 className="font-semibold">Anhänge</h2>
       {editable && (
-        <form
-          action={uploadAttachment.bind(null, id)}
-          className="mt-4 rounded-md border p-4"
-        >
-          <AttachmentPicker fieldName="file" multiple={false} />
-          <button className="mt-4 rounded-md bg-[#175f91] px-4 py-2.5 text-sm font-semibold text-white">
-            Auswahl hochladen
-          </button>
-        </form>
+        <AttachmentUploadForm requestId={id} />
       )}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {attachments.map((a) => (

@@ -10,6 +10,7 @@ const filters: Array<{ key: InboxFilter; label: string }> = [
   { key: "ALL", label: "Alle" }, { key: "APPROVALS", label: "Freigaben" },
   { key: "REVIEWS", label: "Prüfungen" }, { key: "PURCHASING", label: "Einkauf" },
   { key: "FINAL", label: "Abschluss" }, { key: "TASKS", label: "Aufgaben" },
+  { key: "REVISIONS", label: "Überarbeitung" },
   { key: "OVERDUE", label: "Überfällig" },
 ];
 const date=(value:Date)=>new Intl.DateTimeFormat("de-CH",{dateStyle:"medium"}).format(value);

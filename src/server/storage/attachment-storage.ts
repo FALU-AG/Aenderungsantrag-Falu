@@ -1,3 +1,4 @@
+import "server-only";
 import path from "node:path";
 import { readAttachment, removeAttachmentFile, validateAttachment } from "./local-storage";
 import { createSupabaseStorageClient, downloadSupabaseObject, removeSupabaseObject, uploadSupabaseObject } from "./supabase-storage";

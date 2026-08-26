@@ -26,11 +26,16 @@ const load = cache(async (userId: string, rolesKey: string) => {
         },
       },
     }),
-    hasWorkflowRole
-      ? db.changeRequest.findMany({
-          where: { status: { not: "CLOSED" } },
+    db.changeRequest.findMany({
+          where: {
+            OR: [
+              ...(hasWorkflowRole ? [{ status: { not: "CLOSED" as const } }] : []),
+              { applicantId: userId, status: "CHANGES_REQUESTED" as const },
+            ],
+          },
           select: {
             id: true,
+            applicantId: true,
             number: true,
             title: true,
             status: true,
@@ -45,10 +50,9 @@ const load = cache(async (userId: string, rolesKey: string) => {
             avorImpactReview: { select: { completed: true } },
             purchasingReview: { select: { completed: true } },
           },
-        })
-      : Promise.resolve([]),
+        }),
   ]);
-  return buildPersonalInbox({ roles, requests, tasks });
+  return buildPersonalInbox({ userId, roles, requests, tasks });
 });
 
 export function loadPersonalInbox(user: Pick<AuthUser, "id" | "roles">) {

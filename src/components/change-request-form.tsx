@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { Check, ChevronDown, X } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import {
@@ -84,6 +85,14 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
       {state.message && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {state.message}
+          {state.savedRequestId && (
+            <Link
+              href={`/change-requests/${state.savedRequestId}`}
+              className="ml-2 font-semibold underline"
+            >
+              Gespeicherten Antrag öffnen
+            </Link>
+          )}
         </div>
       )}
       <Card className="p-4 sm:p-6">

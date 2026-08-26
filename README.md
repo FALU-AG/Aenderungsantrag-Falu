@@ -112,6 +112,8 @@ npm run storage:check
 
 In Railway werden `DATABASE_URL`, `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY` benötigt. Ein Railway Volume ist nicht erforderlich. Historische Datensätze mit Provider `LOCAL` bleiben lokal lesbar, solange die Datei existiert; ist sie in einer Produktionsinstanz nicht vorhanden, zeigt die Downloadroute `Anhang ist nicht mehr verfügbar.` Eine automatische oder destruktive Migration bestehender Dateien findet nicht statt.
 
+Neue Anhänge werden im privaten Bucket `change-request-attachments` unter `change-requests/{requestId}/{attachmentId}/{safeFilename}` abgelegt. Die Anwendung erlaubt PDF, PNG, JPEG, DOCX und XLSX bis maximal 20 MB pro Datei; das Server-Action-Transportlimit ist dafür inklusive Multipart-Overhead auf 21 MB gesetzt. Downloads laufen ausschließlich über die authentifizierte Anwendungsroute. Schlägt die DB-Persistierung nach einem erfolgreichen Upload fehl, wird exakt das zuvor hochgeladene Objekt wieder entfernt.
+
 ## Phase-2-Routen
 
 - `/change-requests`: Liste, Suche, Filter, Sortierung und Pagination

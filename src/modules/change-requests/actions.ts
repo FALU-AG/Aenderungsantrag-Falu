@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { randomUUID } from "node:crypto";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
 import { requirePermission } from "@/modules/authorization/permissions";
@@ -15,14 +14,16 @@ import {
 } from "./validation";
 import { generateChangeRequestNumber } from "./numbering";
 import { requireDraftEdit } from "./authorization";
-import { cleanupUploadedAttachment, removeStoredAttachment, supabaseObjectKey, uploadNewAttachment } from "@/server/storage/attachment-storage";
+import { removeStoredAttachment } from "@/server/storage/attachment-storage";
 import { submissionData } from "./submission";
 import { machineTypeChangeSummary } from "./machine-type-change";
 import { queueApprovalCycleNotifications } from "@/modules/notifications/workflow";
 import { sendNotifications } from "@/modules/notifications/service";
 import { permanentlyDeleteChangeRequest } from "./delete-change-request";
+import { persistAttachmentUpload } from "./attachment-upload";
 
-export type FormState = { errors?: Record<string, string[]>; message?: string };
+export type FormState = { errors?: Record<string, string[]>; message?: string; savedRequestId?: string };
+export type AttachmentActionState = { error?: string; success?: string };
 export type DeleteChangeRequestState = { error?: string };
 const errorsOf = (error: {
   flatten(): { fieldErrors: Record<string, string[]> };
@@ -276,8 +277,15 @@ export async function saveChangeRequest(
   const files = formData
     .getAll("attachments")
     .filter((item): item is File => item instanceof File && item.size > 0);
-  for (const file of files)
-    await uploadAttachmentForRequest(requestId, user.id, file);
+  try {
+    for (const file of files)
+      await uploadAttachmentForRequest(requestId, user.id, file);
+  } catch (error) {
+    return {
+      message: attachmentErrorMessage(error, true),
+      savedRequestId: requestId,
+    };
+  }
   revalidatePath("/");
   revalidatePath("/change-requests");
   redirect(`/change-requests/${requestId}`);
@@ -288,37 +296,20 @@ async function uploadAttachmentForRequest(
   userId: string,
   file: File,
 ) {
-  const attachmentId = randomUUID();
-  const key = supabaseObjectKey(requestId, attachmentId, file.name);
-  await uploadNewAttachment(file, key);
-  try { await db.$transaction(async (tx) => {
-    const attachment = await tx.attachment.create({
-      data: {
-        id: attachmentId,
-        changeRequestId: requestId,
-        originalName: file.name,
-        storageKey: key,
-        storageProvider: "SUPABASE",
-        mimeType: file.type,
-        sizeBytes: file.size,
-        uploadedById: userId,
-      },
-    });
-    await tx.auditEvent.create({
-      data: {
-        changeRequestId: requestId,
-        userId,
-        action: "ATTACHMENT_UPLOADED",
-        entityType: "Attachment",
-        entityId: attachment.id,
-        summary: `Anhang «${file.name}» hochgeladen`,
-        details: { sizeBytes: file.size, mimeType: file.type },
-      },
-    });
-  }); } catch (error) { await cleanupUploadedAttachment(key); throw error; }
+  return persistAttachmentUpload(requestId, userId, file);
 }
 
-export async function uploadAttachment(requestId: string, formData: FormData) {
+function attachmentErrorMessage(error: unknown, requestSaved = false) {
+  const message = error instanceof Error ? error.message : "";
+  const safe = message.includes("Supabase Storage ist nicht konfiguriert")
+    ? message
+    : message.includes("Dateityp nicht erlaubt") || message.includes("20 MB") || message.includes("Datei ist leer")
+      ? message
+      : "Der Anhang konnte nicht hochgeladen werden.";
+  return requestSaved ? `Der Änderungsantrag wurde gespeichert. ${safe}` : safe;
+}
+
+export async function uploadAttachment(requestId: string, _state: AttachmentActionState, formData: FormData): Promise<AttachmentActionState> {
   const user = await getCurrentUser();
   const request = await db.changeRequest.findUniqueOrThrow({
     where: { id: requestId },
@@ -326,9 +317,14 @@ export async function uploadAttachment(requestId: string, formData: FormData) {
   });
   requireDraftEdit(user, request);
   const file = formData.get("file");
-  if (!(file instanceof File)) throw new Error("Keine Datei ausgewählt.");
-  await uploadAttachmentForRequest(requestId, user.id, file);
+  if (!(file instanceof File) || file.size === 0) return { error: "Keine Datei ausgewählt." };
+  try {
+    await uploadAttachmentForRequest(requestId, user.id, file);
+  } catch (error) {
+    return { error: attachmentErrorMessage(error) };
+  }
   revalidatePath(`/change-requests/${requestId}`);
+  return { success: "Anhang erfolgreich hochgeladen." };
 }
 
 export async function removeAttachment(attachmentId: string) {

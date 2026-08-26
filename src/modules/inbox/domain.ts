@@ -6,6 +6,7 @@ export type InboxKind =
   | "REVIEW"
   | "PURCHASING"
   | "FINAL_APPROVAL"
+  | "REVISION"
   | "TASK";
 export type InboxFilter =
   | "ALL"
@@ -13,11 +14,13 @@ export type InboxFilter =
   | "REVIEWS"
   | "PURCHASING"
   | "FINAL"
+  | "REVISIONS"
   | "TASKS"
   | "OVERDUE";
 
 export type RequestRef = {
   id: string;
+  applicantId: string;
   number: string;
   title: string;
   status: string;
@@ -80,25 +83,28 @@ const hasFinalApproval = (
   );
 const workflowItem = (
   request: RequestRef,
-  input: Pick<InboxItem, "id" | "kind" | "typeLabel" | "action" | "href">,
+  input: Pick<InboxItem, "id" | "kind" | "typeLabel" | "action" | "href"> &
+    Partial<Pick<InboxItem, "statusLabel">>,
 ): InboxItem => ({
   ...input,
   requestId: request.id,
   requestNumber: request.number,
   requestTitle: request.title,
   machineTypes: request.machineTypes.map(({ machineType }) => machineType.code),
-  statusLabel: "Offen",
+  statusLabel: input.statusLabel ?? "Offen",
   dueDate: null,
   priority: null,
   overdue: false,
 });
 
 export function buildPersonalInbox({
+  userId,
   roles,
   requests,
   tasks,
   now = new Date(),
 }: {
+  userId: string;
   roles: readonly RoleKey[];
   requests: RequestRef[];
   tasks: TaskRef[];
@@ -110,6 +116,17 @@ export function buildPersonalInbox({
 
   for (const request of requests) {
     if (request.status === "CLOSED") continue;
+    if (request.status === "CHANGES_REQUESTED" && request.applicantId === userId)
+      items.push(
+        workflowItem(request, {
+          id: `revision:${request.id}`,
+          kind: "REVISION",
+          typeLabel: "Überarbeitung",
+          action: "Änderungsantrag überarbeiten und erneut einreichen",
+          href: `/change-requests/${request.id}/edit`,
+          statusLabel: "Änderung erforderlich",
+        }),
+      );
     const avorApproval = activeApproval(request, "AVOR");
     const technicalApproval = activeApproval(request, "TECHNICAL");
 
@@ -258,6 +275,7 @@ export function filterInbox(items: InboxItem[], filter: InboxFilter) {
     REVIEWS: ["REVIEW"],
     PURCHASING: ["PURCHASING"],
     FINAL: ["FINAL_APPROVAL"],
+    REVISIONS: ["REVISION"],
     TASKS: ["TASK"],
   };
   return items.filter((item) => kinds[filter].includes(item.kind));

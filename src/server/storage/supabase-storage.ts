@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const ATTACHMENT_BUCKET = "change-request-attachments";
@@ -13,7 +14,7 @@ export function createSupabaseStorageClient(environment?: SupabaseStorageEnviron
 export type StorageClient = Pick<SupabaseClient, "storage">;
 export async function uploadSupabaseObject(client: StorageClient, key: string, data: Buffer, mimeType: string) {
   const { error } = await client.storage.from(ATTACHMENT_BUCKET).upload(key, data, { contentType: mimeType, upsert: false });
-  if (error) throw new Error("Datei konnte nicht hochgeladen werden.");
+  if (error) throw new Error("Der Anhang konnte nicht hochgeladen werden.");
 }
 export async function downloadSupabaseObject(client: StorageClient, key: string) {
   const { data, error } = await client.storage.from(ATTACHMENT_BUCKET).download(key);

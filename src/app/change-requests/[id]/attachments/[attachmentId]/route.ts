@@ -7,7 +7,8 @@ import { readStoredAttachment } from "@/server/storage/attachment-storage";
 export async function GET(_request: Request, { params }: RouteContext<"/change-requests/[id]/attachments/[attachmentId]">) {
   const user = await getCurrentUser(); requirePermission(user, "CHANGE_REQUEST_VIEW");
   const { id, attachmentId } = await params;
-  const item = await db.attachment.findFirstOrThrow({ where: { id: attachmentId, changeRequestId: id, deletedAt: null } });
+  const item = await db.attachment.findFirst({ where: { id: attachmentId, changeRequestId: id, deletedAt: null } });
+  if (!item) return new NextResponse("Anhang wurde nicht gefunden.", { status: 404 });
   try {
     const data = await readStoredAttachment(item.storageProvider, item.storageKey);
     return new NextResponse(data, { headers: { "Content-Type": item.mimeType, "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(item.originalName)}`, "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store" } });
