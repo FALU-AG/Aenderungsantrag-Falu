@@ -148,6 +148,19 @@ APP_BASE_URL="https://aenderungsantrag-falu-production.up.railway.app"
 
 `EMAIL_MODE` muss explizit `disabled`, `redirect` oder `live` sein. Lokal ist `disabled` sicher voreingestellt; `redirect` leitet alle Empfänger an `EMAIL_REDIRECT_TO` um. Den Versand erst nach verifizierter Domain (einschliesslich der von Resend gelieferten SPF-/DKIM-DNS-Einträge) auf `live` stellen. Der Resend-Webhook zeigt auf `/api/webhooks/resend` und wird mit `RESEND_WEBHOOK_SECRET` signaturgeprüft.
 
+### Geplante E-Mail-Jobs auf Railway
+
+Inaktivität wird aus dem jüngsten fachlichen Audit-Ereignis eines eingereichten, noch offenen Änderungsantrags abgeleitet; `submittedAt` dient als Fallback. Seitenaufrufe und das allgemeine `updatedAt` zählen nicht. Nach sieben vollen Tagen wird der Antragsteller informiert, danach höchstens einmal pro weiterem Sieben-Tage-Fenster. Eine neue fachliche Aktivität startet das Fenster neu. Der persönliche Wochen-Digest fasst pro aktivem Benutzer alle zugewiesenen, nicht abgeschlossenen Aufgaben in genau einer Nachricht zusammen.
+
+Railway wertet Cron-Ausdrücke in UTC aus. Damit 08:00 Uhr `Europe/Zurich` sowohl in CET als auch CEST eingehalten wird, werden zwei kurze Cron-Services aus demselben Repository angelegt. Beide übernehmen dieselben Umgebungsvariablen wie der Web-Service und erhalten keinen öffentlichen Domainnamen:
+
+| Service | Start Command | Cron Schedule (UTC) |
+| --- | --- | --- |
+| Inaktivitätserinnerungen | `npm run notifications:inactivity` | `0 6,7 * * *` |
+| Wöchentliche Aufgaben | `npm run notifications:weekly-tasks` | `0 6,7 * * 1` |
+
+Die Skripte prüfen zusätzlich mit der IANA-Zeitzone `Europe/Zurich`, ob lokal tatsächlich 08:00 Uhr ist. Daher arbeitet je nach Sommer-/Winterzeit nur einer der beiden UTC-Läufe; die anderen beenden sich ohne Änderungen. Fachliche Idempotenzschlüssel in der `EmailNotification`-Outbox verhindern doppelte Nachrichten auch bei Wiederholungen. Die Cron-Services müssen nach dem Lauf beendet werden; beide Skripte trennen dafür ihre Prisma-Verbindung. `EMAIL_MODE=disabled`, `redirect` und `live` gelten unverändert auch für diese Jobs.
+
 Sicherer Produktions-Rollout:
 
 1. Sender-Domain in Resend verifizieren und SPF/DKIM einrichten.

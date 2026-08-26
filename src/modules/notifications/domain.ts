@@ -1,6 +1,6 @@
 import type { EmailNotificationType } from "@prisma/client";
 
-export type NotificationTemplateData = Record<string, string | number | null | undefined>;
+export type NotificationTemplateData = Record<string, unknown>;
 export type NotificationInput = {
   type: EmailNotificationType;
   idempotencyKey: string;

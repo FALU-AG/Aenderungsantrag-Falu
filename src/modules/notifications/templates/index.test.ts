@@ -2,7 +2,7 @@ import type { EmailNotificationType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { renderNotification } from ".";
 
-const workflowTypes: EmailNotificationType[] = ["USER_INVITATION", "APPROVAL_REQUIRED_AVOR", "APPROVAL_REQUIRED_TECHNICAL", "TASK_ASSIGNED", "REQUEST_CHANGES_REQUIRED", "REQUEST_APPROVED", "REQUEST_PHASE_CHANGED", "REQUEST_CLOSED"];
+const workflowTypes: EmailNotificationType[] = ["USER_INVITATION", "APPROVAL_REQUIRED_AVOR", "APPROVAL_REQUIRED_TECHNICAL", "TASK_ASSIGNED", "REQUEST_CHANGES_REQUIRED", "REQUEST_APPROVED", "REQUEST_PHASE_CHANGED", "REQUEST_CLOSED", "REQUEST_INACTIVITY_REMINDER"];
 
 describe("notification templates", () => {
   it("renders a branded password-reset CTA, security guidance and complete fallback URL", () => {
@@ -36,4 +36,14 @@ describe("notification templates", () => {
   });
 
   it("escapes internal values in HTML", () => expect(renderNotification("TASK_ASSIGNED", "Aufgabe", { detail: "<script>" }).html).not.toContain("<script>"));
+
+  it("renders all digest groups and direct task links in one branded email", () => {
+    const item = { title: "Zeichnung aktualisieren", number: "CR-2026-025", requestTitle: "Riemenspanner", priority: "Hoch", dueDate: "21.08.2026", status: "Offen", url: "https://app.example/change-requests/1?tab=Aufgaben#task-1" };
+    const result = renderNotification("WEEKLY_TASK_DIGEST", "Digest", { openCount: 3, overdueCount: 1, dueThisWeekCount: 1, overdue: [item], dueThisWeek: [{ ...item, title: "Bestellung prüfen" }], other: [{ ...item, title: "Dokumentation" }], url: "https://app.example/meine-aufgaben" });
+    expect(result.html).toContain("Überfällig");
+    expect(result.html).toContain("Diese Woche fällig");
+    expect(result.html).toContain("Weitere offene Aufgaben");
+    expect(result.html).toContain(item.url);
+    expect(result.text).toContain("Zeichnung aktualisieren");
+  });
 });

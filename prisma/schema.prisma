@@ -76,6 +76,8 @@ enum EmailNotificationType {
   REQUEST_APPROVED
   REQUEST_PHASE_CHANGED
   REQUEST_CLOSED
+  REQUEST_INACTIVITY_REMINDER
+  WEEKLY_TASK_DIGEST
 }
 
 enum EmailNotificationStatus {

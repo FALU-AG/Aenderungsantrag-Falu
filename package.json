@@ -24,7 +24,9 @@
     "db:delete-test-requests": "tsx scripts/delete-test-change-requests.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
     "storage:check": "tsx scripts/check-storage.ts",
-    "notifications:retry": "tsx scripts/retry-notifications.ts"
+    "notifications:retry": "tsx scripts/retry-notifications.ts",
+    "notifications:inactivity": "tsx scripts/send-inactivity-reminders.ts",
+    "notifications:weekly-tasks": "tsx scripts/send-weekly-task-digests.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
