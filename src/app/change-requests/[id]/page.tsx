@@ -61,6 +61,7 @@ import {
 } from "@/modules/final-review/domain";
 import { formatDateTimeZurich } from "@/lib/date-time";
 import { canDeleteChangeRequest } from "@/modules/change-requests/authorization";
+import { withBasePath } from "@/lib/app-paths";
 import { DeleteChangeRequestAction } from "@/components/delete-change-request-action";
 
 const tabs = [
@@ -1001,7 +1002,7 @@ function Attachments({
           >
             {a.mimeType.startsWith("image/") ? (
               <Image
-                src={`/change-requests/${id}/attachments/${a.id}`}
+                src={withBasePath(`/change-requests/${id}/attachments/${a.id}`)}
                 alt=""
                 width={64}
                 height={64}

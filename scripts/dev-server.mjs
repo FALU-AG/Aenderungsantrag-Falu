@@ -2,7 +2,7 @@ import net from "node:net";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-export const DEV_URL = "http://localhost:3000";
+export const DEV_URL = "http://localhost:3000/aenderungsantrag";
 
 export async function isApplicationReady(fetchImpl = fetch) {
   try {

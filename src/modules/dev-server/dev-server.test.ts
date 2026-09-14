@@ -19,7 +19,7 @@ describe("Entwicklungsserver-Wiederherstellung", () => {
         ready: vi.fn().mockResolvedValue(true),
         start,
       }),
-    ).resolves.toEqual({ started: false, url: "http://localhost:3000" });
+    ).resolves.toEqual({ started: false, url: "http://localhost:3000/aenderungsantrag" });
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -48,7 +48,7 @@ describe("Entwicklungsserver-Wiederherstellung", () => {
         wait: vi.fn(),
         attempts: 3,
       }),
-    ).resolves.toEqual({ started: true, url: "http://localhost:3000" });
+    ).resolves.toEqual({ started: true, url: "http://localhost:3000/aenderungsantrag" });
     expect(start).toHaveBeenCalledOnce();
   });
 });

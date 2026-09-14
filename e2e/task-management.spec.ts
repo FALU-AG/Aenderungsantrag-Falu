@@ -28,7 +28,7 @@ test.afterAll(async () => prisma.$disconnect());
 test("erstellt, bearbeitet und erledigt eine zugewiesene Aufgabe", async ({
   page,
 }) => {
-  await page.goto("/change-requests?q=CR-2026-004");
+  await page.goto("change-requests?q=CR-2026-004");
   await page.getByRole("link", { name: "CR-2026-004" }).click();
   await page.getByRole("link", { name: "Aufgaben", exact: true }).click();
   await expect(page).toHaveURL(/tab=Aufgaben/);
@@ -51,11 +51,11 @@ test("erstellt, bearbeitet und erledigt eine zugewiesene Aufgabe", async ({
   await expect(page.getByRole("heading", { name: title }).first()).toBeVisible();
   await logout(page);
   await loginAs(page, "thomas.technik@example.falu.ch");
-  await page.goto("/meine-aufgaben");
+  await page.goto("meine-aufgaben");
   await expect(
     page.locator("header p").filter({ hasText: "Thomas Technik" }),
   ).toBeVisible();
-  await page.goto("/meine-aufgaben");
+  await page.goto("meine-aufgaben");
   const card = page
     .locator("div.rounded-lg")
     .filter({ has: page.getByRole("heading", { name: title }) });

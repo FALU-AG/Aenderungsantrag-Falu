@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/modules/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isPublicAuthPath } from "@/modules/auth/public-routes";
+import { withBasePath } from "@/lib/app-paths";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,8 +17,8 @@ export const metadata: Metadata = {
   title: "Falu Change Request",
   description: "Interne Änderungsanträge der Falu AG",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: ["/icon.svg"],
+    icon: [{ url: withBasePath("/icon.svg"), type: "image/svg+xml" }],
+    shortcut: [withBasePath("/icon.svg")],
   },
 };
 

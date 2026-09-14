@@ -15,6 +15,7 @@ const digestTask = (id: string, dueDate: string | null, status = "OPEN") => ({ i
 describe("scheduled notification jobs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.APP_BASE_URL = "http://localhost:3000/aenderungsantrag";
     mocks.requestRecipient.mockResolvedValue({ id: "applicant", email: "applicant@falu.ch", name: "Antragsteller" });
     mocks.queue.mockImplementation(async (_db, input) => ({ id: input.idempotencyKey }));
     mocks.send.mockResolvedValue(undefined);
@@ -26,7 +27,7 @@ describe("scheduled notification jobs", () => {
     mocks.requestFindMany.mockResolvedValue([request()]);
     await runInactivityReminders({ now, ignoreSchedule: true });
     expect(mocks.requestRecipient).toHaveBeenCalledWith(expect.anything(), "cr-1");
-    expect(mocks.queue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "REQUEST_INACTIVITY_REMINDER", recipientEmail: "applicant@falu.ch", subject: "Keine Aktivität seit 7 Tagen | CR-2026-025", templateData: expect.objectContaining({ url: "http://localhost:3000/change-requests/cr-1", lastActivity: "17.08.2026" }) }));
+    expect(mocks.queue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "REQUEST_INACTIVITY_REMINDER", recipientEmail: "applicant@falu.ch", subject: "Keine Aktivität seit 7 Tagen | CR-2026-025", templateData: expect.objectContaining({ url: "http://localhost:3000/aenderungsantrag/change-requests/cr-1", lastActivity: "17.08.2026" }) }));
   });
 
   it("does not remind before seven days or for draft/closed requests", async () => {

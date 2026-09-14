@@ -22,7 +22,7 @@ npm run dev:check
 npm run dev:ensure
 ```
 
-Die Anwendung ist anschließend unter `http://localhost:3000` erreichbar. Die PostgreSQL-Datenbank wird lokal auf Port `5432` bereitgestellt.
+Die Anwendung ist anschließend unter `http://localhost:3000/aenderungsantrag` erreichbar. Die PostgreSQL-Datenbank wird lokal auf Port `5432` bereitgestellt.
 
 ## Umgebungsvariablen
 
@@ -57,7 +57,7 @@ npm run build
 
 Für den ersten Playwright-Lauf kann `npx playwright install chromium` erforderlich sein.
 
-`npm run dev:ensure` prüft `http://localhost:3000`, startet den Next.js-Entwicklungsserver bei Bedarf im Hintergrund und verhindert einen Doppelstart. Ist Port 3000 durch einen anderen Prozess belegt, wird dies als Fehler gemeldet.
+`npm run dev:ensure` prüft `http://localhost:3000/aenderungsantrag`, startet den Next.js-Entwicklungsserver bei Bedarf im Hintergrund und verhindert einen Doppelstart. Ist Port 3000 durch einen anderen Prozess belegt, wird dies als Fehler gemeldet.
 
 ## OpenAI-Unterstützung
 
@@ -145,10 +145,23 @@ RESEND_WEBHOOK_SECRET="..."
 EMAIL_FROM="FALU Change Request <change-request@bestätigte-domain>"
 EMAIL_MODE="redirect"
 EMAIL_REDIRECT_TO="kontrolliertes-testpostfach@..."
-APP_BASE_URL="https://aenderungsantrag-falu-production.up.railway.app"
+APP_BASE_URL="https://admin.falu.com/aenderungsantrag"
 ```
 
-`EMAIL_MODE` muss explizit `disabled`, `redirect` oder `live` sein. Lokal ist `disabled` sicher voreingestellt; `redirect` leitet alle Empfänger an `EMAIL_REDIRECT_TO` um. Den Versand erst nach verifizierter Domain (einschliesslich der von Resend gelieferten SPF-/DKIM-DNS-Einträge) auf `live` stellen. Der Resend-Webhook zeigt auf `/api/webhooks/resend` und wird mit `RESEND_WEBHOOK_SECRET` signaturgeprüft.
+`APP_BASE_URL` bezeichnet immer die vollständige, extern sichtbare Wurzel **dieser Anwendung**, einschließlich `/aenderungsantrag`. Alle E-Mail-Links werden relativ zu dieser Wurzel erzeugt; der Base Path wird weder ausgelassen noch doppelt ergänzt.
+
+`EMAIL_MODE` muss explizit `disabled`, `redirect` oder `live` sein. Lokal ist `disabled` sicher voreingestellt; `redirect` leitet alle Empfänger an `EMAIL_REDIRECT_TO` um. Den Versand erst nach verifizierter Domain (einschliesslich der von Resend gelieferten SPF-/DKIM-DNS-Einträge) auf `live` stellen. Der öffentlich konfigurierte Resend-Webhook lautet nach der Umstellung `https://admin.falu.com/aenderungsantrag/api/webhooks/resend` und wird mit `RESEND_WEBHOOK_SECRET` signaturgeprüft.
+
+## Betrieb unter `/aenderungsantrag`
+
+Next.js ist mit `basePath: "/aenderungsantrag"` gebaut. Normale `Link`- und Router-Navigation verwendet weiterhin interne App-Routen wie `/change-requests`; Next.js ergänzt den Base Path. Native Browser-URLs, Proxy-Redirects, Anhänge und absolute E-Mail-Links verwenden die zentrale Pfadlogik in `src/lib/app-paths.ts`.
+
+- Portal: `https://admin.falu.com/aenderungsantrag`
+- Bestehende Railway-Domain: `https://<railway-domain>/aenderungsantrag`
+- Resend-Webhook: `https://admin.falu.com/aenderungsantrag/api/webhooks/resend`
+- Railway-Root `/`: leitet nicht authentifizierte Aufrufe auf `/aenderungsantrag/login` weiter; die Anwendung selbst bleibt unter dem Base Path erreichbar.
+
+Das Session-Cookie bleibt `HttpOnly`, `SameSite=Lax` und in Produktion `Secure`. Sein Pfad `/` erlaubt die Anmeldung unter dem Base Path und schwächt die übrigen Cookie-Sicherheitsattribute nicht.
 
 ### Geplante E-Mail-Jobs auf Railway
 

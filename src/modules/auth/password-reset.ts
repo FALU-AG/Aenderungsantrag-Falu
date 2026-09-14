@@ -5,6 +5,7 @@ import { hashPassword } from "./password";
 import { PASSWORD_RESET_TTL_MINUTES } from "@/modules/notifications/domain";
 import { queueNotification } from "@/modules/notifications/repository";
 import { sendNotification } from "@/modules/notifications/service";
+import { absoluteAppUrl } from "@/lib/app-paths";
 
 export const hashResetToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -27,7 +28,7 @@ export async function requestPasswordReset(email: string) {
   });
   const base = process.env.APP_BASE_URL;
   if (!base) return;
-  await sendNotification(id, { sensitiveData: { url: `${new URL(base).origin}/reset-password?token=${encodeURIComponent(rawToken)}` } });
+  await sendNotification(id, { sensitiveData: { url: absoluteAppUrl(`/reset-password?token=${encodeURIComponent(rawToken)}`, base) } });
 }
 
 export async function consumePasswordReset(token: string, password: string) {

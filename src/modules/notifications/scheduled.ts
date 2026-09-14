@@ -7,8 +7,9 @@ import { queueNotification } from "./repository";
 import { requestRecipient } from "./recipients";
 import { sendNotifications } from "./service";
 import { canReceiveInactivityReminder, groupDigestTasks, inactivityKey, inactivityPeriod, isZurichRunTime, RELEVANT_ACTIVITY_ACTIONS, zurichDateKey, type DigestTask } from "./scheduled-domain";
+import { absoluteAppUrl } from "@/lib/app-paths";
 
-const baseUrl = () => new URL(process.env.APP_BASE_URL ?? "http://localhost:3000").origin;
+const appUrl = (path: string) => absoluteAppUrl(path);
 
 export async function runInactivityReminders(options: { now?: Date; ignoreSchedule?: boolean } = {}) {
   const now = options.now ?? new Date();
@@ -32,7 +33,7 @@ export async function runInactivityReminders(options: { now?: Date; ignoreSchedu
       recipientName: recipient.name,
       changeRequestId: request.id,
       subject: `Keine Aktivität seit 7 Tagen | ${request.number}`,
-      templateData: { number: request.number, title: request.title, status: STATUS_LABELS[request.status], phase: STATUS_LABELS[request.status], lastActivity: formatDateZurich(lastActivityAt), url: `${baseUrl()}/change-requests/${request.id}` },
+      templateData: { number: request.number, title: request.title, status: STATUS_LABELS[request.status], phase: STATUS_LABELS[request.status], lastActivity: formatDateZurich(lastActivityAt), url: appUrl(`/change-requests/${request.id}`) },
     });
     ids.push(row.id);
   }
@@ -41,7 +42,7 @@ export async function runInactivityReminders(options: { now?: Date; ignoreSchedu
 }
 
 function serializeTask(task: DigestTask) {
-  return { title: task.title, number: task.changeRequest.number, requestTitle: task.changeRequest.title, priority: PRIORITY_LABELS[task.priority], dueDate: task.dueDate ? formatDateZurich(task.dueDate) : "Kein Termin", status: TASK_STATUS_LABELS[task.status], url: `${baseUrl()}/change-requests/${task.changeRequest.id}?tab=Aufgaben#task-${task.id}` };
+  return { title: task.title, number: task.changeRequest.number, requestTitle: task.changeRequest.title, priority: PRIORITY_LABELS[task.priority], dueDate: task.dueDate ? formatDateZurich(task.dueDate) : "Kein Termin", status: TASK_STATUS_LABELS[task.status], url: appUrl(`/change-requests/${task.changeRequest.id}?tab=Aufgaben#task-${task.id}`) };
 }
 
 export async function runWeeklyTaskDigests(options: { now?: Date; ignoreSchedule?: boolean } = {}) {
@@ -61,7 +62,7 @@ export async function runWeeklyTaskDigests(options: { now?: Date; ignoreSchedule
       recipientEmail: user.email,
       recipientName: user.name,
       subject: "Meine offenen Aufgaben | FALU Change Request",
-      templateData: { openCount: user.assignedTasks.length, overdueCount: groups.overdue.length, dueThisWeekCount: groups.dueThisWeek.length, overdue: groups.overdue.map(serializeTask), dueThisWeek: groups.dueThisWeek.map(serializeTask), other: groups.other.map(serializeTask), url: `${baseUrl()}/meine-aufgaben` },
+      templateData: { openCount: user.assignedTasks.length, overdueCount: groups.overdue.length, dueThisWeekCount: groups.dueThisWeek.length, overdue: groups.overdue.map(serializeTask), dueThisWeek: groups.dueThisWeek.map(serializeTask), other: groups.other.map(serializeTask), url: appUrl("/meine-aufgaben") },
     });
     ids.push(row.id);
   }

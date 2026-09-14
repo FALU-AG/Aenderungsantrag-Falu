@@ -3,14 +3,14 @@ import { NextRequest } from "next/server";
 import { proxy } from "./proxy";
 
 describe("Authentifizierungs-Proxy", () => {
-  it.each(["/login", "/forgot-password", "/reset-password", "/api/webhooks/resend"])("lässt %s ohne Sitzung passieren", (path) => {
-    const response = proxy(new NextRequest(`https://app.falu.ch${path}`));
+  it.each(["/login", "/forgot-password", "/reset-password", "/api/webhooks/resend"])("lässt %s unter dem Base Path ohne Sitzung passieren", (path) => {
+    const response = proxy(new NextRequest(`https://admin.falu.com/aenderungsantrag${path}`));
     expect(response.status).toBe(200);
     expect(response.headers.get("location")).toBeNull();
   });
   it("leitet eine geschützte Route ohne Sitzung zur Anmeldung", () => {
-    const response = proxy(new NextRequest("https://app.falu.ch/change-requests"));
+    const response = proxy(new NextRequest("https://admin.falu.com/aenderungsantrag/change-requests"));
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://app.falu.ch/login");
+    expect(response.headers.get("location")).toBe("https://admin.falu.com/aenderungsantrag/login");
   });
 });

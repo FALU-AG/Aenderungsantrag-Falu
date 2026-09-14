@@ -50,7 +50,7 @@ test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
   page,
 }) => {
   test.setTimeout(90000);
-  await page.goto("/change-requests");
+  await page.goto("change-requests");
   await page.getByRole("link", { name: number }).click();
   await page
     .getByRole("link", { name: "Abschlussprüfung", exact: true })
