@@ -10,7 +10,12 @@ const nextConfig: NextConfig = {
   experimental: {
     // The application validates each attachment at 20 MB. Allow the multipart
     // envelope a small amount of additional headroom before app validation.
-    serverActions: { bodySizeLimit: "21mb" },
+    serverActions: {
+      bodySizeLimit: "21mb",
+      // The browser uses this public origin while Cloudflare forwards to Railway.
+      // Keep the allowlist exact so Next.js retains its Origin/Host CSRF check.
+      allowedOrigins: ["admin.falu.com"],
+    },
   },
 };
 
