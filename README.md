@@ -127,9 +127,13 @@ Antragsnummern werden beim ersten Speichern serverseitig über einen jährlichen
 
 Im Tab `Freigaben` entscheiden AVOR und Technik unabhängig voneinander. Entscheidungen sind unveränderlich, rollenbasiert geschützt und werden gemeinsam mit automatischen Statusübergängen und Audit-Ereignissen transaktional gespeichert. Eine Ablehnung führt zu `Änderung erforderlich`; nach der Überarbeitung erzeugt die erneute Einreichung eine neue Freigaberunde, während frühere Runden vollständig lesbar bleiben.
 
-## E-Mail-Benachrichtigungen und Passwort-Wiederherstellung
+## Slack-Benachrichtigungen und Passwort-Wiederherstellung
 
-E-Mails laufen zentral über eine transaktionale `EmailNotification`-Outbox und den serverseitigen Resend-Provider. Geschäftsdaten werden zuerst committed; Providerfehler werden danach in der Outbox erfasst und verändern den erfolgreichen Workflow nicht. Wiederholungen sind durch fachliche Idempotenzschlüssel und zusätzlich durch den Resend-Idempotency-Key geschützt. Fehlgeschlagene, nicht sicherheitskritische Nachrichten können begrenzt wiederholt werden:
+Workflow- und Betriebsbenachrichtigungen werden als persönliche Slack-Direktnachrichten über die Slack Web API versendet. Dazu gehören AVOR- und Technik-Freigaben, Überarbeitungsaufforderungen, Freigaben, Aufgaben-Zuweisungen und -Neuzuweisungen, Abschlüsse, Inaktivitätserinnerungen und Wochenübersichten. Die Anwendung löst Empfänger ausschließlich über deren gespeicherte E-Mail-Adresse mit `users.lookupByEmail` auf. AVOR- und Technik-Empfänger folgen den explizit gespeicherten Fachrollen; eine reine Administratorrolle erzeugt keine Fachbenachrichtigung.
+
+Passwort-Reset, Account-Recovery und vorbereitete Einladungen bleiben bei Resend. Normale Workflow-Ereignisse werden nicht zusätzlich per E-Mail versendet.
+
+Alle Ereignisse laufen weiterhin zentral über die bestehende transaktionale `EmailNotification`-Outbox. Der historische Tabellenname bleibt aus Kompatibilitätsgründen bestehen; vorhandene E-Mail-Datensätze werden weder gelöscht noch migriert. Eine zentrale Provider-Abstraktion wählt anhand des Ereignistyps Slack oder E-Mail. Geschäftsdaten werden zuerst committed; Providerfehler oder ein fehlendes Slack-Konto werden danach sicher in der Outbox erfasst und verändern den erfolgreichen Workflow nicht. Fachliche Idempotenzschlüssel verhindern doppelte Nachrichten. Fehlgeschlagene, nicht sicherheitskritische Nachrichten können begrenzt wiederholt werden:
 
 ```bash
 npm run notifications:retry
@@ -140,6 +144,8 @@ Passwort-Reset-Links verwenden kryptografisch zufällige, einmalige Tokens mit 3
 Erforderliche Railway-Variablen:
 
 ```env
+SLACK_BOT_TOKEN="xoxb-..."
+SLACK_NOTIFICATIONS_ENABLED="true"
 RESEND_API_KEY="..."
 RESEND_WEBHOOK_SECRET="..."
 EMAIL_FROM="FALU Change Request <change-request@bestätigte-domain>"
@@ -148,7 +154,13 @@ EMAIL_REDIRECT_TO="kontrolliertes-testpostfach@..."
 APP_BASE_URL="https://admin.falu.com/aenderungsantrag"
 ```
 
-`APP_BASE_URL` bezeichnet immer die vollständige, extern sichtbare Wurzel **dieser Anwendung**, einschließlich `/aenderungsantrag`. Alle E-Mail-Links werden relativ zu dieser Wurzel erzeugt; der Base Path wird weder ausgelassen noch doppelt ergänzt.
+Der Slack Bot benötigt die OAuth-Scopes `chat:write`, `users:read` und `users:read.email`. `SLACK_BOT_TOKEN` ist ausschließlich serverseitig und darf nie als `NEXT_PUBLIC_`-Variable gesetzt werden. Mit `SLACK_NOTIFICATIONS_ENABLED=false` erfolgen keine externen Slack-Aufrufe. Die Verbindung und Bot-Identität können ohne Testnachricht geprüft werden:
+
+```bash
+npm run slack:check
+```
+
+`APP_BASE_URL` bezeichnet immer die vollständige, extern sichtbare Wurzel **dieser Anwendung**, einschließlich `/aenderungsantrag`. Alle Slack- und Recovery-Links werden relativ zu dieser Wurzel erzeugt; der Base Path wird weder ausgelassen noch doppelt ergänzt.
 
 `EMAIL_MODE` muss explizit `disabled`, `redirect` oder `live` sein. Lokal ist `disabled` sicher voreingestellt; `redirect` leitet alle Empfänger an `EMAIL_REDIRECT_TO` um. Den Versand erst nach verifizierter Domain (einschliesslich der von Resend gelieferten SPF-/DKIM-DNS-Einträge) auf `live` stellen. Der öffentlich konfigurierte Resend-Webhook lautet nach der Umstellung `https://admin.falu.com/aenderungsantrag/api/webhooks/resend` und wird mit `RESEND_WEBHOOK_SECRET` signaturgeprüft.
 
@@ -163,7 +175,7 @@ Next.js ist mit `basePath: "/aenderungsantrag"` gebaut. Normale `Link`- und Rout
 
 Das Session-Cookie bleibt `HttpOnly`, `SameSite=Lax` und in Produktion `Secure`. Sein Pfad `/` erlaubt die Anmeldung unter dem Base Path und schwächt die übrigen Cookie-Sicherheitsattribute nicht.
 
-### Geplante E-Mail-Jobs auf Railway
+### Geplante Slack-Jobs auf Railway
 
 Inaktivität wird aus dem jüngsten fachlichen Audit-Ereignis eines eingereichten, noch offenen Änderungsantrags abgeleitet; `submittedAt` dient als Fallback. Seitenaufrufe und das allgemeine `updatedAt` zählen nicht. Nach sieben vollen Tagen wird der Antragsteller informiert, danach höchstens einmal pro weiterem Sieben-Tage-Fenster. Eine neue fachliche Aktivität startet das Fenster neu. Der persönliche Wochen-Digest fasst pro aktivem Benutzer alle zugewiesenen, nicht abgeschlossenen Aufgaben in genau einer Nachricht zusammen.
 
@@ -174,17 +186,16 @@ Railway wertet Cron-Ausdrücke in UTC aus. Damit 08:00 Uhr `Europe/Zurich` sowoh
 | Inaktivitätserinnerungen | `npm run notifications:inactivity` | `0 6,7 * * *` |
 | Wöchentliche Aufgaben | `npm run notifications:weekly-tasks` | `0 6,7 * * 1` |
 
-Die Skripte prüfen zusätzlich mit der IANA-Zeitzone `Europe/Zurich`, ob lokal tatsächlich 08:00 Uhr ist. Daher arbeitet je nach Sommer-/Winterzeit nur einer der beiden UTC-Läufe; die anderen beenden sich ohne Änderungen. Fachliche Idempotenzschlüssel in der `EmailNotification`-Outbox verhindern doppelte Nachrichten auch bei Wiederholungen. Die Cron-Services müssen nach dem Lauf beendet werden; beide Skripte trennen dafür ihre Prisma-Verbindung. `EMAIL_MODE=disabled`, `redirect` und `live` gelten unverändert auch für diese Jobs.
+Die Skripte prüfen zusätzlich mit der IANA-Zeitzone `Europe/Zurich`, ob lokal tatsächlich 08:00 Uhr ist. Daher arbeitet je nach Sommer-/Winterzeit nur einer der beiden UTC-Läufe; die anderen beenden sich ohne Änderungen. Fachliche Idempotenzschlüssel in der bestehenden Outbox verhindern doppelte Nachrichten auch bei Wiederholungen. Die Cron-Services müssen nach dem Lauf beendet werden; beide Skripte trennen dafür ihre Prisma-Verbindung. Zeitlogik, Inaktivitätsfenster und wöchentliche Gruppierung bleiben unverändert; nur der Versandkanal ist Slack.
 
 Sicherer Produktions-Rollout:
 
-1. Sender-Domain in Resend verifizieren und SPF/DKIM einrichten.
-2. Railway-Variablen setzen, zunächst `EMAIL_MODE=redirect` mit kontrolliertem Testpostfach.
-3. Deploy inklusive `npx prisma migrate deploy` ausführen.
-4. Passwort-Reset, AVOR-/Technik-Freigabe, Aufgabenzuweisung, Ablehnung und Abschluss testen.
-5. `EmailNotification`-Datensätze und sichere Fehlertexte prüfen.
-6. Resend-Webhook konfigurieren und Zustände `sent`, `delivered`, `bounced` und `complained` prüfen.
-7. Erst danach `EMAIL_MODE=live` setzen.
+1. Slack App installieren und die Scopes `chat:write`, `users:read`, `users:read.email` erteilen.
+2. `SLACK_BOT_TOKEN` setzen und mit `npm run slack:check` prüfen.
+3. Zunächst `SLACK_NOTIFICATIONS_ENABLED=false` deployen und anschließend bewusst aktivieren.
+4. AVOR-/Technik-Freigabe, Aufgabenzuweisung, Ablehnung, Abschluss und Cron-Jobs kontrolliert testen.
+5. Outbox-Datensätze und sichere Fehlertexte prüfen; fehlende Slack-Benutzer in Slack beziehungsweise über übereinstimmende E-Mail-Adressen korrigieren.
+6. Resend-Konfiguration und Webhook für Passwort-Recovery unverändert beibehalten und Passwort-Reset separat testen.
 
 ## Phase-4-Technische-Prüfung
 

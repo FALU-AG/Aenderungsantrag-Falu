@@ -18,5 +18,5 @@ export const PASSWORD_RESET_TTL_MINUTES = 30;
 
 export function safeDeliveryError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unbekannter Versandfehler";
-  return message.replace(/\b(re_|whsec_)[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 500);
+  return message.replace(/\b(re_|whsec_|xox[baprs]-)[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 500);
 }

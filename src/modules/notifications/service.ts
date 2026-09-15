@@ -1,17 +1,15 @@
 import "server-only";
 import { db } from "@/server/db/client";
-import { createEmailProvider, type EmailProvider } from "./provider";
 import { MAX_DELIVERY_ATTEMPTS, safeDeliveryError, type NotificationTemplateData } from "./domain";
-import { renderNotification } from "./templates";
+import { createNotificationDeliveryProvider, type NotificationDeliveryProvider } from "./delivery";
 
-export async function sendNotification(id: string, options: { provider?: EmailProvider; sensitiveData?: NotificationTemplateData } = {}) {
+export async function sendNotification(id: string, options: { provider?: NotificationDeliveryProvider; sensitiveData?: NotificationTemplateData } = {}) {
   const notification = await db.emailNotification.findUnique({ where: { id } });
   if (!notification || !["PENDING", "FAILED"].includes(notification.status) || notification.attemptCount >= MAX_DELIVERY_ATTEMPTS) return false;
   const data = { ...((notification.templateData ?? {}) as NotificationTemplateData), ...(options.sensitiveData ?? {}) };
   if (notification.type === "PASSWORD_RESET" && !data.url) return false;
-  const content = renderNotification(notification.type, notification.subject, data);
   try {
-    const result = await (options.provider ?? createEmailProvider()).send({ to: notification.recipientEmail, subject: notification.subject, ...content, idempotencyKey: notification.idempotencyKey });
+    const result = await (options.provider ?? createNotificationDeliveryProvider()).send({ type: notification.type, recipientEmail: notification.recipientEmail, subject: notification.subject, data, idempotencyKey: notification.idempotencyKey });
     await db.emailNotification.update({ where: { id }, data: { status: "SENT", providerMessageId: result.id === "disabled" ? null : result.id, sentAt: new Date(), failedAt: null, lastError: null, attemptCount: { increment: 1 } } });
     return true;
   } catch (error) {
