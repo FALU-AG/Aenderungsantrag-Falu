@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ requestFindMany: vi.fn(), userFindMany: vi.fn(
 vi.mock("@/server/db/client", () => ({ db: { changeRequest: { findMany: mocks.requestFindMany }, user: { findMany: mocks.userFindMany } } }));
 vi.mock("./recipients", () => ({ requestRecipient: mocks.requestRecipient }));
 vi.mock("./repository", () => ({ queueNotification: mocks.queue }));
-vi.mock("./service", () => ({ sendNotifications: mocks.send }));
+vi.mock("./service-core", () => ({ sendNotifications: mocks.send }));
 
 import { runInactivityReminders, runWeeklyTaskDigests } from "./scheduled";
 

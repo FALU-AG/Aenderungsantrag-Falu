@@ -1,11 +1,10 @@
-import "server-only";
 import { db } from "@/server/db/client";
 import { formatDateZurich } from "@/lib/date-time";
 import { STATUS_LABELS } from "@/modules/workflow/status";
 import { PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/modules/tasks/domain";
 import { queueNotification } from "./repository";
 import { requestRecipient } from "./recipients";
-import { sendNotifications } from "./service";
+import { sendNotifications } from "./service-core";
 import { canReceiveInactivityReminder, groupDigestTasks, inactivityKey, inactivityPeriod, isZurichRunTime, RELEVANT_ACTIVITY_ACTIONS, zurichDateKey, type DigestTask } from "./scheduled-domain";
 import { absoluteAppUrl } from "@/lib/app-paths";
 

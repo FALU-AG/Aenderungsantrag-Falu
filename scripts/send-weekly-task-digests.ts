@@ -1,4 +1,16 @@
 import { runWeeklyTaskDigests } from "../src/modules/notifications/scheduled";
+import { runScheduledCommand } from "../src/modules/notifications/cron-cli";
 import { db } from "../src/server/db/client";
 
-runWeeklyTaskDigests().then(({ queued, skippedSchedule }) => console.log(skippedSchedule ? "Kein geplanter Ausführungszeitpunkt." : `${queued} Wochenübersicht(en) verarbeitet.`)).catch(() => { console.error("Wochenübersichten konnten nicht verarbeitet werden."); process.exitCode = 1; }).finally(() => db.$disconnect());
+export function main() {
+  return runScheduledCommand({
+    job: runWeeklyTaskDigests,
+    disconnect: () => db.$disconnect(),
+    processedMessage: (queued) => `${queued} Wochenübersicht(en) verarbeitet.`,
+    failureMessage: "Wochenübersichten konnten nicht verarbeitet werden.",
+  });
+}
+
+if (process.argv[1]?.endsWith("send-weekly-task-digests.ts")) {
+  void main().then((exitCode) => { process.exitCode = exitCode; });
+}

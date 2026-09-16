@@ -1,4 +1,16 @@
 import { runInactivityReminders } from "../src/modules/notifications/scheduled";
+import { runScheduledCommand } from "../src/modules/notifications/cron-cli";
 import { db } from "../src/server/db/client";
 
-runInactivityReminders().then(({ queued, skippedSchedule }) => console.log(skippedSchedule ? "Kein geplanter Ausführungszeitpunkt." : `${queued} Inaktivitätserinnerung(en) verarbeitet.`)).catch(() => { console.error("Inaktivitätserinnerungen konnten nicht verarbeitet werden."); process.exitCode = 1; }).finally(() => db.$disconnect());
+export function main() {
+  return runScheduledCommand({
+    job: runInactivityReminders,
+    disconnect: () => db.$disconnect(),
+    processedMessage: (queued) => `${queued} Inaktivitätserinnerung(en) verarbeitet.`,
+    failureMessage: "Inaktivitätserinnerungen konnten nicht verarbeitet werden.",
+  });
+}
+
+if (process.argv[1]?.endsWith("send-inactivity-reminders.ts")) {
+  void main().then((exitCode) => { process.exitCode = exitCode; });
+}
