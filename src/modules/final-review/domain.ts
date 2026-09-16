@@ -8,9 +8,6 @@ export const FINAL_TYPE_LABELS: Record<FinalApprovalType, string> = {
 export const finalApprovalSchema = z.object({
   comment: z.string().trim().max(8000),
 });
-export const finalCommentSchema = z.object({
-  finalComment: z.string().trim().min(1, "Bitte erfassen Sie einen internen Abschlussbericht.").max(12000),
-});
 export const reasonSchema = z.object({
   reason: z.string().trim().min(1, "Bitte geben Sie einen Grund an.").max(8000),
 });
@@ -37,7 +34,6 @@ export type ClosureState = {
   avorCompleted: boolean;
   purchasingCompleted: boolean;
   blockingTasks: number;
-  completionSummaryPresent: boolean;
 };
 export function closurePrerequisites(input: ClosureState) {
   return [
@@ -60,11 +56,6 @@ export function closurePrerequisites(input: ClosureState) {
       key: "tasks",
       label: "Keine offenen abschlussrelevanten Aufgaben",
       satisfied: input.blockingTasks === 0,
-    },
-    {
-      key: "summary",
-      label: "Interner Abschlussbericht erfasst",
-      satisfied: input.completionSummaryPresent,
     },
   ];
 }

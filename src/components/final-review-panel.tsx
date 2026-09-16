@@ -1,13 +1,11 @@
 "use client";
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { AssistedTextField } from "@/components/assisted-text-field";
 import { Card } from "@/components/ui/card";
 import {
   grantFinalApproval,
   reopenClosedRequest,
   requestFinalChanges,
-  saveFinalComment,
   type FinalReviewActionState,
 } from "@/modules/final-review/actions";
 import {
@@ -149,11 +147,12 @@ export function FinalReviewPanel({
           })}
         </div>
       </Card>
-      <FinalComment
-        requestId={requestId}
-        value={finalComment}
-        editable={status === "FINAL_REVIEW" && canRequestChanges}
-      />
+      {status === "CLOSED" && finalComment && (
+        <Card className="border-emerald-200 p-6">
+          <h2 className="font-semibold">Abschlusszusammenfassung</h2>
+          <p className="mt-3 whitespace-pre-wrap text-sm">{finalComment}</p>
+        </Card>
+      )}
       {status === "FINAL_REVIEW" && canRequestChanges && (
         <ChangesRequired requestId={requestId} />
       )}{" "}
@@ -227,48 +226,6 @@ function ApprovalAction({
         </Modal>
       )}
     </>
-  );
-}
-function FinalComment({
-  requestId,
-  value,
-  editable,
-}: {
-  requestId: string;
-  value: string | null;
-  editable: boolean;
-}) {
-  const [state, action, pending] = useActionState(
-    saveFinalComment.bind(null, requestId),
-    {} as FinalReviewActionState,
-  );
-  return (
-    <Card className="p-6">
-      <form action={action}>
-        <AssistedTextField
-          name="finalComment"
-          label="Interner Abschlussbericht"
-          defaultValue={value}
-          disabled={!editable}
-          multiline
-          rows={5}
-        />
-        {state.message && (
-          <p className="mt-2 text-sm text-red-700">{state.message}</p>
-        )}
-        {state.success && (
-          <p className="mt-2 text-sm text-emerald-700">{state.success}</p>
-        )}
-        {editable && (
-          <button
-            disabled={pending}
-            className="mt-4 rounded-md border px-3 py-2 text-sm font-semibold"
-          >
-            Abschlussbericht speichern
-          </button>
-        )}
-      </form>
-    </Card>
   );
 }
 function ChangesRequired({ requestId }: { requestId: string }) {

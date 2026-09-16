@@ -13,17 +13,17 @@ vi.mock("@/server/db/client", () => ({ db: client }));
 vi.mock("./workflow", () => ({ queueCompletedRequestBroadcast: mocks.queueBroadcast }));
 vi.mock("./service-core", () => ({ sendNotifications: mocks.send }));
 
-import { completionSummaryRequest, generateAndBroadcastCompletionSummary } from "./completion-summary";
+import { completionSummaryRequest, generateAndBroadcastCompletionSummary, runCompletionCommunicationAfterClosure } from "./completion-summary";
 
 const source = {
   status: "CLOSED",
-  aiCompletionSummary: null,
   number: "CR-2026-041",
   title: "Optimierung Abstreifer CB1",
   applicantName: "Florian Kaufmann",
   description: "Verschleiss reduzieren",
   otherReasonText: null,
-  finalComment: "Abstreifer ersetzt und Dokumentation angepasst.",
+  finalComment: null,
+  closingRemarks: "Abstreifer ersetzt und Dokumentation angepasst.",
   closedAt: new Date("2026-09-16T10:00:00Z"),
   machineTypes: [{ machineType: { code: "CB1" } }],
   reasons: [{ changeReason: { label: "Qualitätsverbesserung" } }],
@@ -31,6 +31,7 @@ const source = {
   avorImpactReview: null,
   purchasingReview: null,
   tasks: [{ title: "Zeichnung anpassen", description: "Revision erhöhen" }],
+  finalApprovals: [{ type: "TECHNICAL" as const, comment: "Technisch abgeschlossen." }],
 };
 
 describe("automatic completion summary", () => {
@@ -47,8 +48,8 @@ describe("automatic completion summary", () => {
   it("generates, stores, audits, and broadcasts only after CLOSED", async () => {
     const provider = { formulate: vi.fn().mockResolvedValue("Der Abstreifer der CB1 wurde ersetzt. Die Dokumentation wurde angepasst.") };
     await expect(generateAndBroadcastCompletionSummary("cr-1", { provider })).resolves.toEqual({ status: "completed", sent: 2 });
-    expect(provider.formulate).toHaveBeenCalledWith(expect.objectContaining({ notes: expect.stringContaining("Interner Abschlussbericht: Abstreifer ersetzt"), context: expect.stringContaining("Erfinde nichts") }));
-    expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: "CLOSED", aiCompletionSummary: null }), data: expect.objectContaining({ aiCompletionSummary: "Der Abstreifer der CB1 wurde ersetzt. Die Dokumentation wurde angepasst.", aiSummaryError: null }) }));
+    expect(provider.formulate).toHaveBeenCalledWith(expect.objectContaining({ notes: expect.stringContaining("Abschlussnotizen: Abstreifer ersetzt"), context: expect.stringContaining("Erfinde nichts") }));
+    expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: "CLOSED", finalComment: null }), data: { finalComment: "Der Abstreifer der CB1 wurde ersetzt. Die Dokumentation wurde angepasst." } }));
     expect(mocks.queueBroadcast).toHaveBeenCalledWith(client, "cr-1");
     expect(mocks.send).toHaveBeenCalledWith(["notification-1", "notification-2"]);
   });
@@ -64,13 +65,22 @@ describe("automatic completion summary", () => {
   it("keeps CLOSED, records failure, and sends no misleading message when AI fails", async () => {
     const provider = { formulate: vi.fn().mockRejectedValue(new Error("provider unavailable")) };
     await expect(generateAndBroadcastCompletionSummary("cr-1", { provider })).resolves.toEqual({ status: "failed", sent: 0 });
-    expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: "CLOSED" }), data: { aiSummaryError: "provider unavailable" } }));
+    expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "AI_COMPLETION_SUMMARY_FAILED", details: { error: "provider unavailable" } }) }));
     expect(mocks.queueBroadcast).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
   });
 
+  it("recovers on a later retry after an AI failure", async () => {
+    await generateAndBroadcastCompletionSummary("cr-1", { provider: { formulate: vi.fn().mockRejectedValue(new Error("temporary")) } });
+    mocks.queueBroadcast.mockResolvedValue(["notification-1"]);
+    const retryProvider = { formulate: vi.fn().mockResolvedValue("Automatisch erzeugte Abschlusszusammenfassung.") };
+    await expect(generateAndBroadcastCompletionSummary("cr-1", { provider: retryProvider })).resolves.toEqual({ status: "completed", sent: 1 });
+    expect(mocks.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { finalComment: "Automatisch erzeugte Abschlusszusammenfassung." } }));
+    expect(mocks.send).toHaveBeenCalledWith(["notification-1"]);
+  });
+
   it("reuses a stored summary so retry cannot generate a different text", async () => {
-    mocks.findUnique.mockResolvedValue({ ...source, aiCompletionSummary: "Bereits gespeicherte Zusammenfassung." });
+    mocks.findUnique.mockResolvedValue({ ...source, finalComment: "Bereits gespeicherte Zusammenfassung." });
     const provider = { formulate: vi.fn() };
     await generateAndBroadcastCompletionSummary("cr-1", { provider });
     expect(provider.formulate).not.toHaveBeenCalled();
@@ -85,5 +95,20 @@ describe("automatic completion summary", () => {
     expect(request.notes).toContain("Qualitätsverbesserung");
     expect(request.notes).toContain("Zeichnung anpassen");
     expect(request.notes).not.toContain("Internet");
+  });
+
+  it("runs automatically after a successful final close and not for an intermediate approval", async () => {
+    const run = vi.fn().mockResolvedValue(undefined);
+    await runCompletionCommunicationAfterClosure("cr-1", true, run);
+    await runCompletionCommunicationAfterClosure("cr-2", false, run);
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith("cr-1");
+  });
+
+  it("does not propagate an AI or delivery failure back into the completed workflow", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(runCompletionCommunicationAfterClosure("cr-1", true, vi.fn().mockRejectedValue(new Error("failed")))).resolves.toBeUndefined();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

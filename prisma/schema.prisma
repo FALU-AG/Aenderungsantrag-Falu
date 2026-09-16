@@ -207,9 +207,6 @@ model ChangeRequest {
   approvalCycle        Int                        @default(1)
   finalReviewCycle     Int                        @default(1)
   finalComment         String?
-  aiCompletionSummary  String?
-  aiSummaryGeneratedAt DateTime?
-  aiSummaryError       String?
   version              Int                        @default(1)
   submittedAt          DateTime?
   closedAt             DateTime?

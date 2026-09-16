@@ -5,7 +5,7 @@ vi.mock("./recipients", () => ({ activeRoleRecipients: mocks.activeRoleRecipient
 vi.mock("./repository", () => ({ queueNotification: mocks.queue }));
 import { queueApprovalCycleNotifications, queueCompletedRequestBroadcast, queueRequestNotification, queueTaskAssignmentNotification } from "./workflow";
 
-const request = { id: "cr-1", number: "CR-2026-001", title: "Riemenspanner", description: "Spannung verbessert", status: "UNDER_REVIEW", applicantName: "Anna Antrag", approvalCycle: 1, finalReviewCycle: 1, aiCompletionSummary: null, closedAt: null, machineTypes: [{ machineType: { code: "M1" } }] };
+const request = { id: "cr-1", number: "CR-2026-001", title: "Riemenspanner", description: "Spannung verbessert", status: "UNDER_REVIEW", applicantName: "Anna Antrag", approvalCycle: 1, finalReviewCycle: 1, finalComment: null, closedAt: null, machineTypes: [{ machineType: { code: "M1" } }] };
 const tx = {
   changeRequest: { findUniqueOrThrow: vi.fn().mockResolvedValue(request) },
   user: { findMany: vi.fn() },
@@ -41,7 +41,7 @@ describe("workflow notification orchestration", () => {
   });
 
   it("broadcasts a genuine completion once to every active user with the stored summary", async () => {
-    tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status: "CLOSED", aiCompletionSummary: "Neue Halterung montiert und getestet.", closedAt: new Date("2026-09-16T10:00:00Z") });
+    tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status: "CLOSED", finalComment: "Neue Halterung montiert und getestet.", closedAt: new Date("2026-09-16T10:00:00Z") });
     tx.user.findMany.mockResolvedValue([{ id: "u1", email: "u1@falu.ch", name: "Aktiv" }, { id: "u2", email: "u2@falu.ch", name: "Auch aktiv" }]);
     expect(await queueCompletedRequestBroadcast(tx as never, "cr-1")).toHaveLength(2);
     expect(tx.user.findMany).toHaveBeenCalledWith({ where: { active: true }, select: { id: true, email: true, name: true } });
@@ -51,7 +51,7 @@ describe("workflow notification orchestration", () => {
   });
 
   it.each(["UNDER_REVIEW", "APPROVED_FOR_IMPLEMENTATION", "FINAL_REVIEW"])("does not broadcast in intermediate state %s", async (status) => {
-    tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status, aiCompletionSummary: "Noch nicht abgeschlossen", closedAt: null });
+    tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status, finalComment: "Noch nicht abgeschlossen", closedAt: null });
     expect(await queueCompletedRequestBroadcast(tx as never, "cr-1")).toEqual([]);
     expect(tx.user.findMany).not.toHaveBeenCalled();
   });

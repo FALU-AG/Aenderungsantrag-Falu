@@ -17,7 +17,6 @@ const ready = {
   avorCompleted: true,
   purchasingCompleted: true,
   blockingTasks: 0,
-  completionSummaryPresent: true,
 };
 describe("Abschlussprüfung", () => {
   it("trennt AVOR und Technik", () => {
@@ -34,8 +33,8 @@ describe("Abschlussprüfung", () => {
     expect(
       canClose({ ...ready, blockingTasks: 1 }, ["AVOR", "TECHNICAL"]),
     ).toBe(false));
-  it("verlangt vor dem Abschluss eine Abschlusszusammenfassung", () =>
-    expect(canClose({ ...ready, completionSummaryPresent: false }, ["AVOR", "TECHNICAL"])).toBe(false));
+  it("schliesst ohne manuell erfasste Abschlusszusammenfassung", () =>
+    expect(canClose(ready, ["AVOR", "TECHNICAL"])).toBe(true));
   it("zeigt alle Voraussetzungen", () =>
     expect(closurePrerequisites(ready).every((x) => x.satisfied)).toBe(true));
   it("verlangt Gründe", () =>

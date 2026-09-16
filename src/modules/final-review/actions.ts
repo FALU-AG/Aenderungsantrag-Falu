@@ -10,12 +10,11 @@ import {
   canRequestFinalChanges,
   finalApprovalSchema,
   finalAudit,
-  finalCommentSchema,
   nextFinalReviewCycle,
   reasonSchema,
   type FinalApprovalType,
 } from "./domain";
-import { generateAndBroadcastCompletionSummary } from "@/modules/notifications/completion-summary";
+import { runCompletionCommunicationAfterClosure } from "@/modules/notifications/completion-summary";
 export type FinalReviewActionState = { message?: string; success?: string };
 const refresh = (id: string) => {
   revalidatePath("/");
@@ -47,7 +46,6 @@ async function closureState(tx: Prisma.TransactionClient, id: string) {
       technicalReview: { select: { completed: true } },
       avorImpactReview: { select: { completed: true } },
       purchasingReview: { select: { completed: true } },
-      finalComment: true,
       tasks: {
         where: { requiredForClosure: true, status: { not: "DONE" } },
         select: { id: true },
@@ -61,46 +59,8 @@ async function closureState(tx: Prisma.TransactionClient, id: string) {
       avorCompleted: Boolean(request.avorImpactReview?.completed),
       purchasingCompleted: Boolean(request.purchasingReview?.completed),
       blockingTasks: request.tasks.length,
-      completionSummaryPresent: Boolean(request.finalComment?.trim()),
     },
   };
-}
-export async function saveFinalComment(
-  requestId: string,
-  _state: FinalReviewActionState,
-  form: FormData,
-): Promise<FinalReviewActionState> {
-  const user = await getCurrentUser();
-  if (!canRequestFinalChanges(user))
-    return { message: "Sie dürfen die Abschlussbemerkung nicht bearbeiten." };
-  const parsed = finalCommentSchema.safeParse({
-    finalComment: form.get("finalComment"),
-  });
-  if (!parsed.success) return { message: parsed.error.issues[0].message };
-  const changed = await db.changeRequest.updateMany({
-    where: { id: requestId, status: "FINAL_REVIEW" },
-    data: {
-      finalComment: parsed.data.finalComment || null,
-      version: { increment: 1 },
-    },
-  });
-  if (changed.count !== 1)
-    return {
-      message:
-        "Die Abschlussbemerkung ist nur während der Abschlussprüfung bearbeitbar.",
-    };
-  const audit = finalAudit("COMMENT_UPDATED", user.name);
-  await db.auditEvent.create({
-    data: {
-      changeRequestId: requestId,
-      userId: user.id,
-      ...audit,
-      entityType: "ChangeRequest",
-      entityId: requestId,
-    },
-  });
-  refresh(requestId);
-  return { success: "Abschlussbemerkung gespeichert." };
 }
 export async function grantFinalApproval(
   requestId: string,
@@ -183,13 +143,7 @@ export async function grantFinalApproval(
       });
       return true;
     });
-    if (closed) {
-      try {
-        await generateAndBroadcastCompletionSummary(requestId);
-      } catch (error) {
-        console.error("Automatic completion communication failed", { requestId, error });
-      }
-    }
+    await runCompletionCommunicationAfterClosure(requestId, closed);
     refresh(requestId);
     return {
       success: closed
