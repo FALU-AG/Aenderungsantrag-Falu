@@ -183,8 +183,9 @@ Railway wertet Cron-Ausdrücke in UTC aus. Damit 08:00 Uhr `Europe/Zurich` sowoh
 
 | Service | Start Command | Cron Schedule (UTC) |
 | --- | --- | --- |
-| Inaktivitätserinnerungen | `npm run notifications:inactivity` | `0 6,7 * * *` |
-| Wöchentliche Aufgaben | `npm run notifications:weekly-tasks` | `0 6,7 * * 1` |
+| Persönliche Wochenübersicht | `npm run notifications:weekly-digest` | `0 6,7 * * 1` |
+
+Die früheren Befehle `notifications:inactivity` und `notifications:weekly-tasks` bleiben vorübergehend als kompatible Aliase erhalten. Beide führen ausschließlich die persönliche Wochenübersicht aus; separate Inaktivitätserinnerungen werden nicht mehr versendet.
 
 Die Skripte prüfen zusätzlich mit der IANA-Zeitzone `Europe/Zurich`, ob lokal tatsächlich 08:00 Uhr ist. Daher arbeitet je nach Sommer-/Winterzeit nur einer der beiden UTC-Läufe; die anderen beenden sich ohne Änderungen. Fachliche Idempotenzschlüssel in der bestehenden Outbox verhindern doppelte Nachrichten auch bei Wiederholungen. Die Cron-Services müssen nach dem Lauf beendet werden; beide Skripte trennen dafür ihre Prisma-Verbindung. Zeitlogik, Inaktivitätsfenster und wöchentliche Gruppierung bleiben unverändert; nur der Versandkanal ist Slack.
 

@@ -10,8 +10,8 @@ const labels: Partial<Record<EmailNotificationType, string>> = {
   REQUEST_APPROVED: "Änderungsantrag freigegeben",
   REQUEST_PHASE_CHANGED: "Status aktualisiert",
   REQUEST_CLOSED: "Änderungsantrag abgeschlossen",
-  REQUEST_INACTIVITY_REMINDER: "Keine Aktivität seit 7 Tagen",
-  WEEKLY_TASK_DIGEST: "Wöchentliche Aufgabenübersicht",
+  REQUEST_INACTIVITY_REMINDER: "Hinweis zum Änderungsantrag",
+  WEEKLY_TASK_DIGEST: "Persönliche Wochenübersicht",
 };
 
 const value = (input: unknown) => typeof input === "string" || typeof input === "number" ? String(input) : "";
@@ -37,23 +37,32 @@ export function renderSlackNotification(type: EmailNotificationType, subject: st
     });
   }
   if (type === "WEEKLY_TASK_DIGEST") {
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*Offen:* ${value(data.openCount)}  •  *Überfällig:* ${value(data.overdueCount)}  •  *Diese Woche:* ${value(data.dueThisWeekCount)}` },
-    });
-    const tasks = [data.overdue, data.dueThisWeek, data.other]
-      .flatMap((group) => Array.isArray(group) ? group : [])
-      .slice(0, 10)
-      .map((task) => {
-        const item = task as Record<string, unknown>;
-        return `• *${escapeSlack(item.number)}* – ${escapeSlack(item.title)} (${escapeSlack(item.dueDate)})`;
-      });
-    if (tasks.length) blocks.push({ type: "section", text: { type: "mrkdwn", text: tasks.join("\n") } });
+    blocks.splice(0, blocks.length,
+      { type: "header", text: { type: "plain_text", text: `Guten Morgen ${value(data.greetingName)}`, emoji: true } },
+      { type: "section", text: { type: "mrkdwn", text: "Hier ist deine Übersicht für diese Woche:" } },
+    );
+    const addSection = (title: string, items: unknown, render: (item: Record<string, unknown>) => string) => {
+      if (!Array.isArray(items) || items.length === 0) return;
+      for (let index = 0; index < items.length; index += 12) {
+        const heading = index === 0 ? `*${title}*\n` : "";
+        blocks.push({ type: "section", text: { type: "mrkdwn", text: `${heading}${items.slice(index, index + 12).map((item) => render(item as Record<string, unknown>)).join("\n")}` } });
+      }
+    };
+    const taskLine = (item: Record<string, unknown>) => `• *${escapeSlack(item.number)}* – ${escapeSlack(item.title)}${value(item.dueDate) ? ` – fällig ${escapeSlack(item.dueDate)}` : ""}`;
+    addSection("Überfällige Aufgaben", data.overdue, taskLine);
+    addSection("Diese Woche fällige Aufgaben", data.dueThisWeek, taskLine);
+    addSection("Weitere offene Aufgaben", data.other, taskLine);
+    addSection("Eigene Änderungsanträge", data.ownRequests, (item) => `• *${escapeSlack(item.number)}* – ${escapeSlack(item.title)} – ${escapeSlack(item.status)}`);
+    addSection("Offene Freigaben", data.approvals, (item) => `• *${escapeSlack(item.number)}* – ${escapeSlack(item.title)} – ${escapeSlack(item.responsibility)}`);
+  }
+  if (type === "REQUEST_CLOSED" && data.completionSummary) {
+    blocks.push({ type: "section", text: { type: "mrkdwn", text: `*Umgesetzt*\n${escapeSlack(data.completionSummary)}` } });
+    if (data.completedAt) blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `Abgeschlossen am ${escapeSlack(data.completedAt)}` }] });
   }
   if (data.url) {
     blocks.push({
       type: "actions",
-      elements: [{ type: "button", text: { type: "plain_text", text: type === "WEEKLY_TASK_DIGEST" ? "Meine Aufgaben öffnen" : "Änderungsantrag öffnen" }, url: value(data.url), action_id: "open_change_request" }],
+      elements: [{ type: "button", text: { type: "plain_text", text: type === "WEEKLY_TASK_DIGEST" ? "Zur Übersicht" : "Änderungsantrag öffnen" }, url: value(data.url), action_id: "open_change_request" }],
     });
   }
   return { text: `${heading}: ${labels[type] ?? subject}`, blocks };

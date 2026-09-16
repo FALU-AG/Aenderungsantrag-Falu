@@ -25,6 +25,7 @@
     "storage:setup": "tsx scripts/setup-storage.ts",
     "storage:check": "tsx scripts/check-storage.ts",
     "notifications:retry": "tsx scripts/retry-notifications.ts",
+    "notifications:weekly-digest": "tsx scripts/send-weekly-digest.ts",
     "notifications:inactivity": "tsx scripts/send-inactivity-reminders.ts",
     "notifications:weekly-tasks": "tsx scripts/send-weekly-task-digests.ts",
     "slack:check": "tsx scripts/check-slack.ts"

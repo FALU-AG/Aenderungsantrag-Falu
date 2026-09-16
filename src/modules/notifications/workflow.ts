@@ -7,7 +7,38 @@ import { STATUS_LABELS } from "@/modules/workflow/status";
 const appUrl = (path: string) => absoluteAppUrl(path);
 
 async function requestSummary(tx: Prisma.TransactionClient, id: string) {
-  return tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { id: true, number: true, title: true, status: true, applicantName: true, approvalCycle: true, finalReviewCycle: true, machineTypes: { select: { machineType: { select: { code: true } } }, orderBy: { machineType: { code: "asc" } } } } });
+  return tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { id: true, number: true, title: true, description: true, status: true, applicantName: true, approvalCycle: true, finalReviewCycle: true, finalComment: true, closedAt: true, machineTypes: { select: { machineType: { select: { code: true } } }, orderBy: { machineType: { code: "asc" } } } } });
+}
+
+export async function queueCompletedRequestBroadcast(tx: Prisma.TransactionClient, requestId: string) {
+  const request = await requestSummary(tx, requestId);
+  if (request.status !== "CLOSED" || !request.closedAt || !request.finalComment?.trim()) return [];
+  const users = await tx.user.findMany({ where: { active: true }, select: { id: true, email: true, name: true } });
+  const ids: string[] = [];
+  for (const recipient of users) {
+    const row = await queueNotification(tx, {
+      type: "REQUEST_CLOSED",
+      idempotencyKey: `completed-broadcast:${requestId}:${recipient.id}`,
+      recipientUserId: recipient.id,
+      recipientEmail: recipient.email,
+      recipientName: recipient.name,
+      changeRequestId: requestId,
+      subject: `Änderungsantrag abgeschlossen | ${request.number}`,
+      templateData: {
+        number: request.number,
+        title: request.title,
+        applicantName: request.applicantName,
+        machineTypes: request.machineTypes.map(({ machineType }) => machineType.code).join(", "),
+        detail: request.description,
+        completionSummary: request.finalComment,
+        completedAt: request.closedAt.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }),
+        status: STATUS_LABELS[request.status],
+        url: appUrl(`/change-requests/${requestId}`),
+      },
+    });
+    ids.push(row.id);
+  }
+  return ids;
 }
 
 export async function queueApprovalCycleNotifications(tx: Prisma.TransactionClient, requestId: string, cycle: number) {

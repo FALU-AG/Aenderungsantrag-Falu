@@ -1,5 +1,5 @@
-import { runWeeklyDigest } from "../src/modules/notifications/scheduled";
 import { runScheduledCommand } from "../src/modules/notifications/cron-cli";
+import { runWeeklyDigest } from "../src/modules/notifications/scheduled";
 import { db } from "../src/server/db/client";
 
 export function main() {
@@ -11,6 +11,6 @@ export function main() {
   });
 }
 
-if (process.argv[1]?.endsWith("send-inactivity-reminders.ts")) {
+if (process.argv[1]?.endsWith("send-weekly-digest.ts")) {
   void main().then((exitCode) => { process.exitCode = exitCode; });
 }

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { runScheduledCommand } from "./cron-cli";
 
 describe("standalone notification runners", () => {
-  it("imports both tsx entrypoints without executing a job or loading server-only", async () => {
+  it("imports the weekly tsx entrypoint and compatibility aliases without executing a job or loading server-only", async () => {
+    await expect(import("../../../scripts/send-weekly-digest")).resolves.toHaveProperty("main");
     await expect(import("../../../scripts/send-inactivity-reminders")).resolves.toHaveProperty("main");
     await expect(import("../../../scripts/send-weekly-task-digests")).resolves.toHaveProperty("main");
   });

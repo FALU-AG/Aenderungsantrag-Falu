@@ -1,30 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { TaskStatus } from "@prisma/client";
-import { canReceiveInactivityReminder, groupDigestTasks, inactivityKey, inactivityPeriod, isZurichRunTime } from "./scheduled-domain";
+import { groupDigestTasks, isZurichRunTime, zurichIsoWeekKey } from "./scheduled-domain";
 
 const task = (id: string, dueDate: string | null, status: TaskStatus = "OPEN") => ({ id, title: id, dueDate: dueDate ? new Date(dueDate) : null, priority: "HIGH" as const, status, changeRequest: { id: `cr-${id}`, number: `CR-${id}`, title: "Antrag" } });
 
 describe("scheduled notification domain", () => {
   const now = new Date("2026-08-24T06:00:00Z");
 
-  it("waits seven full days and excludes drafts and closed requests", () => {
-    expect(canReceiveInactivityReminder("UNDER_REVIEW", now, new Date("2026-08-17T06:00:01Z"), now)).toBe(false);
-    expect(canReceiveInactivityReminder("UNDER_REVIEW", now, new Date("2026-08-17T06:00:00Z"), now)).toBe(true);
-    expect(canReceiveInactivityReminder("DRAFT", now, new Date("2026-08-01T00:00:00Z"), now)).toBe(false);
-    expect(canReceiveInactivityReminder("CLOSED", now, new Date("2026-08-01T00:00:00Z"), now)).toBe(false);
-  });
-
-  it("uses one deterministic key per seven-day inactivity window", () => {
-    const activity = new Date("2026-08-10T06:00:00Z");
-    expect(inactivityPeriod(activity, now)).toBe(2);
-    expect(inactivityKey("cr-1", activity, 2)).toBe(inactivityKey("cr-1", activity, 2));
-    expect(inactivityKey("cr-1", activity, 1)).not.toBe(inactivityKey("cr-1", activity, 2));
-  });
-
   it("recognizes 08:00 Zurich in summer and winter without fixed UTC offsets", () => {
     expect(isZurichRunTime(new Date("2026-08-24T06:00:00Z"), true)).toBe(true);
     expect(isZurichRunTime(new Date("2026-01-05T07:00:00Z"), true)).toBe(true);
     expect(isZurichRunTime(new Date("2026-08-24T07:00:00Z"), true)).toBe(false);
+  });
+
+  it("uses an ISO year/week key across the same Zurich week", () => {
+    expect(zurichIsoWeekKey(new Date("2026-08-24T06:00:00Z"))).toBe("2026-W35");
+    expect(zurichIsoWeekKey(new Date("2026-08-30T20:00:00Z"))).toBe("2026-W35");
+    expect(zurichIsoWeekKey(new Date("2026-08-31T06:00:00Z"))).toBe("2026-W36");
   });
 
   it("groups overdue, current-week and remaining open tasks and excludes DONE", () => {

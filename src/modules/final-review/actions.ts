@@ -15,7 +15,7 @@ import {
   reasonSchema,
   type FinalApprovalType,
 } from "./domain";
-import { queueRequestNotification } from "@/modules/notifications/workflow";
+import { queueCompletedRequestBroadcast } from "@/modules/notifications/workflow";
 import { sendNotifications } from "@/modules/notifications/service";
 export type FinalReviewActionState = { message?: string; success?: string };
 const refresh = (id: string) => {
@@ -48,6 +48,7 @@ async function closureState(tx: Prisma.TransactionClient, id: string) {
       technicalReview: { select: { completed: true } },
       avorImpactReview: { select: { completed: true } },
       purchasingReview: { select: { completed: true } },
+      finalComment: true,
       tasks: {
         where: { requiredForClosure: true, status: { not: "DONE" } },
         select: { id: true },
@@ -61,6 +62,7 @@ async function closureState(tx: Prisma.TransactionClient, id: string) {
       avorCompleted: Boolean(request.avorImpactReview?.completed),
       purchasingCompleted: Boolean(request.purchasingReview?.completed),
       blockingTasks: request.tasks.length,
+      completionSummaryPresent: Boolean(request.finalComment?.trim()),
     },
   };
 }
@@ -181,7 +183,7 @@ export async function grantFinalApproval(
           details: { cycle: request.finalReviewCycle, triggeredBy: user.id },
         },
       });
-      notificationIds = await queueRequestNotification(tx, requestId, "REQUEST_CLOSED", `closed:${requestId}:${request.finalReviewCycle}`);
+      notificationIds = await queueCompletedRequestBroadcast(tx, requestId);
       return true;
     });
     await sendNotifications(notificationIds);

@@ -330,6 +330,7 @@ export default async function RequestDetailPage({
             technicalCompleted: Boolean(request.technicalReview?.completed),
             avorCompleted: Boolean(request.avorImpactReview?.completed),
             purchasingCompleted: Boolean(request.purchasingReview?.completed),
+            completionSummaryPresent: Boolean(request.finalComment?.trim()),
             blockingTasks: request.tasks.filter(
               (task) => task.requiredForClosure && task.status !== "DONE",
             ).length,
@@ -797,7 +798,7 @@ function FinalStatusSummary({
       </div>
       {request.finalComment && (
         <p className="mt-4 text-sm">
-          <span className="font-medium">Abschlussbemerkung:</span>{" "}
+          <span className="font-medium">Abschlusszusammenfassung:</span>{" "}
           {request.finalComment}
         </p>
       )}
