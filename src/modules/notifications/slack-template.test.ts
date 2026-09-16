@@ -20,12 +20,13 @@ describe("Slack notification presentation", () => {
       number: "CR-2026-041",
       title: "Optimierung Abstreifer CB1",
       applicantName: "Florian Kaufmann",
-      machineTypes: "CB1",
+      machineTypes: "CB1, PMS",
       completionSummary: "Abstreifer ersetzt und im Betrieb getestet.",
       completedAt: "16.09.2026",
       url: "https://admin.falu.com/aenderungsantrag/change-requests/cr-1",
     });
     expect(JSON.stringify(rendered.blocks)).toContain("Abstreifer ersetzt und im Betrieb getestet.");
     expect(JSON.stringify(rendered.blocks)).toContain("16.09.2026");
+    expect(JSON.stringify(rendered.blocks)).toContain("CB1, PMS");
   });
 });

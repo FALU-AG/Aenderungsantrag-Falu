@@ -17,6 +17,7 @@ const ACTIVE_MACHINE_TYPES = [
   "WR-2100 S",
   "WR-600 V",
   "VP-2",
+  "PMS",
 ].map((code) => ({ code, name: code, active: true }));
 
 const INACTIVE_MACHINE_TYPES = ["BLS-12", "SQB-2A", "SQB-AT", "SQT-AT"].map((code) => ({ code, name: code, active: false }));

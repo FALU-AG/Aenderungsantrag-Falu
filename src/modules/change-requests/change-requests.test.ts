@@ -137,6 +137,7 @@ describe("Antragsaufnahme", () => {
   });
   it("filtert und sucht über jede verknüpfte Maschine", () => {
     expect(buildRequestListQuery({ machineTypeId: "m2" }).where).toMatchObject({ machineTypes: { some: { machineTypeId: "m2" } } });
+    expect(buildRequestListQuery({ machineTypeId: "machine-pms" }).where).toMatchObject({ machineTypes: { some: { machineTypeId: "machine-pms" } } });
     expect(buildRequestListQuery({ q: "SV-2X" }).where.OR).toContainEqual({ machineTypes: { some: { machineType: { code: { contains: "SV-2X", mode: "insensitive" } } } } });
   });
   it("ändert beim Bearbeiten nur den Antragstellernamen, nicht den Ersteller", () => {

@@ -25,7 +25,7 @@ const source = {
   finalComment: null,
   closingRemarks: "Abstreifer ersetzt und Dokumentation angepasst.",
   closedAt: new Date("2026-09-16T10:00:00Z"),
-  machineTypes: [{ machineType: { code: "CB1" } }],
+  machineTypes: [{ machineType: { code: "CB1" } }, { machineType: { code: "PMS" } }],
   reasons: [{ changeReason: { label: "Qualitätsverbesserung" } }],
   technicalReview: { implementationNotes: "Neue Ausführung eingebaut.", nextSteps: "Zeichnung aktualisiert." },
   avorImpactReview: null,
@@ -92,6 +92,7 @@ describe("automatic completion summary", () => {
     const request = completionSummaryRequest(source);
     expect(request.notes).toContain("CR-2026-041");
     expect(request.notes).toContain("CB1");
+    expect(request.notes).toContain("PMS");
     expect(request.notes).toContain("Qualitätsverbesserung");
     expect(request.notes).toContain("Zeichnung anpassen");
     expect(request.notes).not.toContain("Internet");
