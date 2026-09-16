@@ -9,7 +9,7 @@ export const finalApprovalSchema = z.object({
   comment: z.string().trim().max(8000),
 });
 export const finalCommentSchema = z.object({
-  finalComment: z.string().trim().min(1, "Bitte erfassen Sie eine Abschlusszusammenfassung.").max(12000),
+  finalComment: z.string().trim().min(1, "Bitte erfassen Sie einen internen Abschlussbericht.").max(12000),
 });
 export const reasonSchema = z.object({
   reason: z.string().trim().min(1, "Bitte geben Sie einen Grund an.").max(8000),
@@ -63,7 +63,7 @@ export function closurePrerequisites(input: ClosureState) {
     },
     {
       key: "summary",
-      label: "Abschlusszusammenfassung erfasst",
+      label: "Interner Abschlussbericht erfasst",
       satisfied: input.completionSummaryPresent,
     },
   ];

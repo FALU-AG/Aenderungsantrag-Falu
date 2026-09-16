@@ -73,6 +73,8 @@ OPENAI_TRANSCRIPTION_MODEL="gpt-4o-mini-transcribe"
 
 Ohne Provider oder API-Schlüssel bleibt die Anwendung normal nutzbar und zeigt einen nicht störenden Hinweis. Für lokale Tests stehen weiterhin `AI_PROVIDER="mock"` und `SPEECH_PROVIDER="mock"` zur Verfügung. API-Schlüssel dürfen nicht committed werden.
 
+Beim endgültigen Abschluss eines Änderungsantrags erzeugt derselbe serverseitige Text-Provider automatisch eine kurze unternehmensweite Abschlusszusammenfassung. Sie wird am Antrag gespeichert und anschliessend per Slack an alle aktiven Benutzer verteilt. Fehlgeschlagene Generierungen bleiben am Antrag protokolliert und können mit `npm run notifications:retry-completion-summaries` erneut verarbeitet werden.
+
 ## Architektur
 
 Die Anwendung ist ein modularer Next.js-Monolith:

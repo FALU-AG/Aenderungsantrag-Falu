@@ -28,6 +28,7 @@
     "notifications:weekly-digest": "tsx scripts/send-weekly-digest.ts",
     "notifications:inactivity": "tsx scripts/send-inactivity-reminders.ts",
     "notifications:weekly-tasks": "tsx scripts/send-weekly-task-digests.ts",
+    "notifications:retry-completion-summaries": "tsx scripts/retry-completion-summaries.ts",
     "slack:check": "tsx scripts/check-slack.ts"
   },
   "prisma": {

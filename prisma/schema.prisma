@@ -193,42 +193,45 @@ model ChangeReason {
 }
 
 model ChangeRequest {
-  id                  String                     @id @default(cuid())
-  number              String                     @unique
-  title               String                     @default("")
-  applicantId         String
-  applicantName       String                     @default("")
-  legacyMachineTypeId String?                    @map("machineTypeId")
-  articleNumber       String?
-  articleDescription  String?
-  description         String                     @default("")
-  otherReasonText     String?
-  status              ChangeRequestStatus        @default(DRAFT)
-  approvalCycle       Int                        @default(1)
-  finalReviewCycle    Int                        @default(1)
-  finalComment        String?
-  version             Int                        @default(1)
-  submittedAt         DateTime?
-  closedAt            DateTime?
-  closedById          String?
-  closingRemarks      String?
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
-  applicant           User                       @relation("Applicant", fields: [applicantId], references: [id])
-  legacyMachineType   MachineType?               @relation("LegacyMachineType", fields: [legacyMachineTypeId], references: [id])
-  machineTypes        ChangeRequestMachineType[]
-  closedBy            User?                      @relation("ClosedBy", fields: [closedById], references: [id])
-  reasons             ChangeRequestReason[]
-  approvals           Approval[]
-  finalApprovals      FinalApproval[]
-  technicalReview     TechnicalReview?
-  avorImpactReview    AvorImpactReview?
-  purchasingReview    PurchasingReview?
-  tasks               Task[]
-  attachments         Attachment[]
-  comments            Comment[]
-  auditEvents         AuditEvent[]
-  emailNotifications  EmailNotification[]
+  id                   String                     @id @default(cuid())
+  number               String                     @unique
+  title                String                     @default("")
+  applicantId          String
+  applicantName        String                     @default("")
+  legacyMachineTypeId  String?                    @map("machineTypeId")
+  articleNumber        String?
+  articleDescription   String?
+  description          String                     @default("")
+  otherReasonText      String?
+  status               ChangeRequestStatus        @default(DRAFT)
+  approvalCycle        Int                        @default(1)
+  finalReviewCycle     Int                        @default(1)
+  finalComment         String?
+  aiCompletionSummary  String?
+  aiSummaryGeneratedAt DateTime?
+  aiSummaryError       String?
+  version              Int                        @default(1)
+  submittedAt          DateTime?
+  closedAt             DateTime?
+  closedById           String?
+  closingRemarks       String?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  applicant            User                       @relation("Applicant", fields: [applicantId], references: [id])
+  legacyMachineType    MachineType?               @relation("LegacyMachineType", fields: [legacyMachineTypeId], references: [id])
+  machineTypes         ChangeRequestMachineType[]
+  closedBy             User?                      @relation("ClosedBy", fields: [closedById], references: [id])
+  reasons              ChangeRequestReason[]
+  approvals            Approval[]
+  finalApprovals       FinalApproval[]
+  technicalReview      TechnicalReview?
+  avorImpactReview     AvorImpactReview?
+  purchasingReview     PurchasingReview?
+  tasks                Task[]
+  attachments          Attachment[]
+  comments             Comment[]
+  auditEvents          AuditEvent[]
+  emailNotifications   EmailNotification[]
 
   @@index([status])
   @@index([legacyMachineTypeId])

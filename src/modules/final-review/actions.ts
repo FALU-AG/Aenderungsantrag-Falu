@@ -15,8 +15,7 @@ import {
   reasonSchema,
   type FinalApprovalType,
 } from "./domain";
-import { queueCompletedRequestBroadcast } from "@/modules/notifications/workflow";
-import { sendNotifications } from "@/modules/notifications/service";
+import { generateAndBroadcastCompletionSummary } from "@/modules/notifications/completion-summary";
 export type FinalReviewActionState = { message?: string; success?: string };
 const refresh = (id: string) => {
   revalidatePath("/");
@@ -117,7 +116,6 @@ export async function grantFinalApproval(
   });
   if (!parsed.success) return { message: parsed.error.issues[0].message };
   try {
-    let notificationIds: string[] = [];
     const closed = await serializable(async (tx) => {
       const { request, state } = await closureState(tx, requestId);
       if (request.status !== "FINAL_REVIEW")
@@ -183,10 +181,15 @@ export async function grantFinalApproval(
           details: { cycle: request.finalReviewCycle, triggeredBy: user.id },
         },
       });
-      notificationIds = await queueCompletedRequestBroadcast(tx, requestId);
       return true;
     });
-    await sendNotifications(notificationIds);
+    if (closed) {
+      try {
+        await generateAndBroadcastCompletionSummary(requestId);
+      } catch (error) {
+        console.error("Automatic completion communication failed", { requestId, error });
+      }
+    }
     refresh(requestId);
     return {
       success: closed

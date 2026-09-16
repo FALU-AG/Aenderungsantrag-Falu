@@ -247,7 +247,7 @@ function FinalComment({
       <form action={action}>
         <AssistedTextField
           name="finalComment"
-          label="Abschlusszusammenfassung"
+          label="Interner Abschlussbericht"
           defaultValue={value}
           disabled={!editable}
           multiline
@@ -264,7 +264,7 @@ function FinalComment({
             disabled={pending}
             className="mt-4 rounded-md border px-3 py-2 text-sm font-semibold"
           >
-            Abschlusszusammenfassung speichern
+            Abschlussbericht speichern
           </button>
         )}
       </form>

@@ -51,7 +51,7 @@ export function getWritingProvider(
   if (env.AI_PROVIDER === "openai") {
     if (!env.OPENAI_API_KEY) return null;
     return new OpenAIWritingProvider(
-      client ?? new OpenAI({ apiKey: env.OPENAI_API_KEY }),
+      client ?? new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: 15_000, maxRetries: 1 }),
       env.OPENAI_TEXT_MODEL || "gpt-5.6",
     );
   }

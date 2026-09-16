@@ -741,6 +741,8 @@ function FinalStatusSummary({
     status: string;
     finalReviewCycle: number;
     finalComment: string | null;
+    aiCompletionSummary: string | null;
+    aiSummaryGeneratedAt: Date | null;
     closedAt: Date | null;
     closedBy: { name: string } | null;
     finalApprovals: Array<{
@@ -798,9 +800,16 @@ function FinalStatusSummary({
       </div>
       {request.finalComment && (
         <p className="mt-4 text-sm">
-          <span className="font-medium">Abschlusszusammenfassung:</span>{" "}
+          <span className="font-medium">Interner Abschlussbericht:</span>{" "}
           {request.finalComment}
         </p>
+      )}
+      {request.aiCompletionSummary && (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-white p-4 text-sm">
+          <p className="font-medium">Unternehmensweite Abschlusszusammenfassung</p>
+          <p className="mt-2 whitespace-pre-wrap">{request.aiCompletionSummary}</p>
+          {request.aiSummaryGeneratedAt && <p className="mt-2 text-xs text-slate-500">Automatisch erstellt am {formatDate(request.aiSummaryGeneratedAt)}</p>}
+        </div>
       )}
     </Card>
   );

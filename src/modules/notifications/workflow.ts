@@ -7,12 +7,12 @@ import { STATUS_LABELS } from "@/modules/workflow/status";
 const appUrl = (path: string) => absoluteAppUrl(path);
 
 async function requestSummary(tx: Prisma.TransactionClient, id: string) {
-  return tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { id: true, number: true, title: true, description: true, status: true, applicantName: true, approvalCycle: true, finalReviewCycle: true, finalComment: true, closedAt: true, machineTypes: { select: { machineType: { select: { code: true } } }, orderBy: { machineType: { code: "asc" } } } } });
+  return tx.changeRequest.findUniqueOrThrow({ where: { id }, select: { id: true, number: true, title: true, description: true, status: true, applicantName: true, approvalCycle: true, finalReviewCycle: true, aiCompletionSummary: true, closedAt: true, machineTypes: { select: { machineType: { select: { code: true } } }, orderBy: { machineType: { code: "asc" } } } } });
 }
 
 export async function queueCompletedRequestBroadcast(tx: Prisma.TransactionClient, requestId: string) {
   const request = await requestSummary(tx, requestId);
-  if (request.status !== "CLOSED" || !request.closedAt || !request.finalComment?.trim()) return [];
+  if (request.status !== "CLOSED" || !request.closedAt || !request.aiCompletionSummary?.trim()) return [];
   const users = await tx.user.findMany({ where: { active: true }, select: { id: true, email: true, name: true } });
   const ids: string[] = [];
   for (const recipient of users) {
@@ -30,7 +30,7 @@ export async function queueCompletedRequestBroadcast(tx: Prisma.TransactionClien
         applicantName: request.applicantName,
         machineTypes: request.machineTypes.map(({ machineType }) => machineType.code).join(", "),
         detail: request.description,
-        completionSummary: request.finalComment,
+        completionSummary: request.aiCompletionSummary,
         completedAt: request.closedAt.toLocaleDateString("de-CH", { timeZone: "Europe/Zurich" }),
         status: STATUS_LABELS[request.status],
         url: appUrl(`/change-requests/${requestId}`),
