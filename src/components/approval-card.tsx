@@ -6,9 +6,9 @@ import { APPROVAL_LABELS, approvalActionAvailable, type ApprovalStatusKey, type 
 import { Card } from "@/components/ui/card";
 
 const badge: Record<ApprovalStatusKey, string> = { PENDING: "bg-amber-50 text-amber-800", APPROVED: "bg-emerald-50 text-emerald-700", REJECTED: "bg-red-50 text-red-700" };
-type Props = { requestId: string; type: ApprovalTypeKey; status: ApprovalStatusKey; cycle: number; currentCycle: number; requestStatus: string; decisionUser?: string | null; decidedAt?: string | null; comment?: string | null; canDecide: boolean };
+type Props = { requestId: string; type: ApprovalTypeKey; status: ApprovalStatusKey; cycle: number; currentCycle: number; requestStatus: string; decisionUser?: string | null; representedUser?: string | null; decidedAt?: string | null; comment?: string | null; canDecide: boolean };
 
-export function ApprovalCard({ requestId, type, status, cycle, currentCycle, requestStatus, decisionUser, decidedAt, comment, canDecide }: Props) {
+export function ApprovalCard({ requestId, type, status, cycle, currentCycle, requestStatus, decisionUser, representedUser, decidedAt, comment, canDecide }: Props) {
   const [rejecting, setRejecting] = useState(false);
   const bound = decideApproval.bind(null, requestId, type);
   const [state, action, pending] = useActionState(bound, {} as ApprovalActionState);
@@ -18,7 +18,7 @@ export function ApprovalCard({ requestId, type, status, cycle, currentCycle, req
   return <Card className="p-4 sm:p-6">
     <div className="flex items-start justify-between"><div><h3 className="text-lg font-semibold">{title}</h3><p className="mt-1 text-xs text-slate-500">Freigaberunde {cycle}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge[status]}`}>{APPROVAL_LABELS[status]}</span></div>
     {type === "TECHNICAL" && status === "APPROVED" && <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">✓ Technische Bearbeitung kann beginnen</p>}
-    {decisionUser && <p className="mt-5 text-sm"><span className="text-slate-500">Entscheidung:</span> {decisionUser}{decidedAt ? ` · ${decidedAt}` : ""}</p>}
+    {decisionUser && <p className="mt-5 text-sm"><span className="text-slate-500">Entscheidung:</span> {decisionUser}{representedUser ? ` als Stellvertreter von ${representedUser}` : ""}{decidedAt ? ` · ${decidedAt}` : ""}</p>}
     {comment && <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">{comment}</p>}
     {stopped && <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Freigaberunde beendet</p><p className="mt-1">Der Antrag wurde bereits abgelehnt und muss zuerst überarbeitet und erneut eingereicht werden.</p></div>}
     {state.error && <p className="mt-3 text-sm text-red-700">{state.error}</p>}

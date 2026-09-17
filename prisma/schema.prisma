@@ -18,6 +18,11 @@ enum ApprovalStatus {
   REJECTED
 }
 
+enum DelegationScope {
+  AVOR_APPROVAL
+  TECHNICAL_APPROVAL
+}
+
 enum ChangeRequestStatus {
   DRAFT
   UNDER_REVIEW
@@ -121,6 +126,30 @@ model User {
   sessions             Session[]
   emailNotifications   EmailNotification[]
   passwordResetTokens  PasswordResetToken[]
+  delegationsGiven     ApprovalDelegation[] @relation("DelegatingUser")
+  delegationsReceived  ApprovalDelegation[] @relation("SubstituteUser")
+  delegationsCreated   ApprovalDelegation[] @relation("DelegationCreator")
+  representedApprovals Approval[]           @relation("ApprovalRepresentedUser")
+}
+
+model ApprovalDelegation {
+  id               String          @id @default(cuid())
+  delegatingUserId String
+  substituteUserId String
+  scope            DelegationScope
+  startsAt         DateTime
+  endsAt           DateTime
+  enabled          Boolean         @default(true)
+  createdById      String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  delegatingUser   User            @relation("DelegatingUser", fields: [delegatingUserId], references: [id])
+  substituteUser   User            @relation("SubstituteUser", fields: [substituteUserId], references: [id])
+  createdBy        User            @relation("DelegationCreator", fields: [createdById], references: [id])
+  approvals        Approval[]
+
+  @@index([substituteUserId, scope, enabled, startsAt, endsAt])
+  @@index([delegatingUserId, scope, enabled])
 }
 
 model PasswordResetToken {
@@ -193,42 +222,42 @@ model ChangeReason {
 }
 
 model ChangeRequest {
-  id                   String                     @id @default(cuid())
-  number               String                     @unique
-  title                String                     @default("")
-  applicantId          String
-  applicantName        String                     @default("")
-  legacyMachineTypeId  String?                    @map("machineTypeId")
-  articleNumber        String?
-  articleDescription   String?
-  description          String                     @default("")
-  otherReasonText      String?
-  status               ChangeRequestStatus        @default(DRAFT)
-  approvalCycle        Int                        @default(1)
-  finalReviewCycle     Int                        @default(1)
-  finalComment         String?
-  version              Int                        @default(1)
-  submittedAt          DateTime?
-  closedAt             DateTime?
-  closedById           String?
-  closingRemarks       String?
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  applicant            User                       @relation("Applicant", fields: [applicantId], references: [id])
-  legacyMachineType    MachineType?               @relation("LegacyMachineType", fields: [legacyMachineTypeId], references: [id])
-  machineTypes         ChangeRequestMachineType[]
-  closedBy             User?                      @relation("ClosedBy", fields: [closedById], references: [id])
-  reasons              ChangeRequestReason[]
-  approvals            Approval[]
-  finalApprovals       FinalApproval[]
-  technicalReview      TechnicalReview?
-  avorImpactReview     AvorImpactReview?
-  purchasingReview     PurchasingReview?
-  tasks                Task[]
-  attachments          Attachment[]
-  comments             Comment[]
-  auditEvents          AuditEvent[]
-  emailNotifications   EmailNotification[]
+  id                  String                     @id @default(cuid())
+  number              String                     @unique
+  title               String                     @default("")
+  applicantId         String
+  applicantName       String                     @default("")
+  legacyMachineTypeId String?                    @map("machineTypeId")
+  articleNumber       String?
+  articleDescription  String?
+  description         String                     @default("")
+  otherReasonText     String?
+  status              ChangeRequestStatus        @default(DRAFT)
+  approvalCycle       Int                        @default(1)
+  finalReviewCycle    Int                        @default(1)
+  finalComment        String?
+  version             Int                        @default(1)
+  submittedAt         DateTime?
+  closedAt            DateTime?
+  closedById          String?
+  closingRemarks      String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  applicant           User                       @relation("Applicant", fields: [applicantId], references: [id])
+  legacyMachineType   MachineType?               @relation("LegacyMachineType", fields: [legacyMachineTypeId], references: [id])
+  machineTypes        ChangeRequestMachineType[]
+  closedBy            User?                      @relation("ClosedBy", fields: [closedById], references: [id])
+  reasons             ChangeRequestReason[]
+  approvals           Approval[]
+  finalApprovals      FinalApproval[]
+  technicalReview     TechnicalReview?
+  avorImpactReview    AvorImpactReview?
+  purchasingReview    PurchasingReview?
+  tasks               Task[]
+  attachments         Attachment[]
+  comments            Comment[]
+  auditEvents         AuditEvent[]
+  emailNotifications  EmailNotification[]
 
   @@index([status])
   @@index([legacyMachineTypeId])
@@ -256,18 +285,22 @@ model ChangeRequestReason {
 }
 
 model Approval {
-  id              String         @id @default(cuid())
-  changeRequestId String
-  type            ApprovalType
-  status          ApprovalStatus @default(PENDING)
-  cycle           Int
-  decisionUserId  String?
-  decidedAt       DateTime?
-  comment         String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  changeRequest   ChangeRequest  @relation(fields: [changeRequestId], references: [id])
-  decisionUser    User?          @relation("ApprovalDecisionUser", fields: [decisionUserId], references: [id])
+  id                String              @id @default(cuid())
+  changeRequestId   String
+  type              ApprovalType
+  status            ApprovalStatus      @default(PENDING)
+  cycle             Int
+  decisionUserId    String?
+  representedUserId String?
+  delegationId      String?
+  decidedAt         DateTime?
+  comment           String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  changeRequest     ChangeRequest       @relation(fields: [changeRequestId], references: [id])
+  decisionUser      User?               @relation("ApprovalDecisionUser", fields: [decisionUserId], references: [id])
+  representedUser   User?               @relation("ApprovalRepresentedUser", fields: [representedUserId], references: [id])
+  delegation        ApprovalDelegation? @relation(fields: [delegationId], references: [id])
 
   @@unique([changeRequestId, type, cycle])
   @@index([status, type])

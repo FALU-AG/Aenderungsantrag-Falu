@@ -1,0 +1,28 @@
+import { Card } from "@/components/ui/card";
+import { formatDateTimeZurich } from "@/lib/date-time";
+import { cancelDelegation, createDelegation, updateDelegation } from "@/modules/delegations/actions";
+import { DELEGATION_SCOPE_LABELS, delegationStatus, type DelegationScopeKey } from "@/modules/delegations/domain";
+
+type Person = { id: string; name: string };
+type Delegation = { id: string; delegatingUserId: string; substituteUserId: string; scope: DelegationScopeKey; startsAt: Date; endsAt: Date; enabled: boolean; delegatingUser: Person; substituteUser: Person };
+const input = "min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-[#175f91] focus:outline-none focus:ring-2 focus:ring-[#175f91]/20";
+const statusLabels = { PLANNED: "Geplant", ACTIVE: "Aktiv", EXPIRED: "Abgelaufen", CANCELLED: "Deaktiviert" };
+const localValue = (date: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date).replace(" ", "T");
+
+export function DelegationManager({ delegations, users, owners, currentUserId, admin = false }: { delegations: Delegation[]; users: Person[]; owners: Array<Person & { scopes: DelegationScopeKey[] }>; currentUserId: string; admin?: boolean }) {
+  const defaultOwner = owners.find((owner) => owner.id === currentUserId) ?? owners[0];
+  return <div className="space-y-5">
+    {defaultOwner ? <Card className="p-5"><h2 className="font-semibold text-slate-900">Stellvertretung erstellen</h2><p className="mt-1 text-sm text-slate-500">Die Berechtigung gilt ausschliesslich für die gewählte Freigabe und den angegebenen Zeitraum.</p><form action={createDelegation} className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {admin ? (
+        <label className="grid gap-1 text-sm font-medium">Delegierende Person<select name="delegatingUserId" className={input} defaultValue={defaultOwner.id}>{owners.map((owner)=><option key={owner.id} value={owner.id}>{owner.name}</option>)}</select></label>
+      ) : (
+        <input type="hidden" name="delegatingUserId" value={currentUserId}/>
+      )}
+      <label className="grid gap-1 text-sm font-medium">Freigabe<select name="scope" className={input}>{(admin ? ["AVOR_APPROVAL", "TECHNICAL_APPROVAL"] as DelegationScopeKey[] : defaultOwner.scopes).map((scope)=><option key={scope} value={scope}>{DELEGATION_SCOPE_LABELS[scope]}</option>)}</select></label>
+      <label className="grid gap-1 text-sm font-medium">Stellvertreter<select name="substituteUserId" className={input}>{users.filter((user)=>user.id!==defaultOwner.id).map((user)=><option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
+      <label className="grid gap-1 text-sm font-medium">Von<input name="startsAt" type="datetime-local" className={input} required/></label><label className="grid gap-1 text-sm font-medium">Bis<input name="endsAt" type="datetime-local" className={input} required/></label>
+      <button className="min-h-11 rounded-md bg-[#175f91] px-4 py-2 text-sm font-semibold text-white xl:col-span-5 xl:justify-self-start">Stellvertretung speichern</button>
+    </form></Card> : <Card className="p-5 text-sm text-slate-600">Für Ihre Rolle kann keine Freigabestellvertretung eingerichtet werden.</Card>}
+    <div className="space-y-3">{delegations.length ? delegations.map((delegation)=>{const status=delegationStatus(delegation);return <Card key={delegation.id} className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{DELEGATION_SCOPE_LABELS[delegation.scope]}</p><p className="text-sm text-slate-600">{delegation.delegatingUser.name} → {delegation.substituteUser.name}</p><p className="mt-1 text-sm text-slate-500">{formatDateTimeZurich(delegation.startsAt)} bis {formatDateTimeZurich(delegation.endsAt)}</p></div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold">{statusLabels[status]}</span></div>{status === "PLANNED" || status === "ACTIVE" ? <details className="mt-4"><summary className="cursor-pointer text-sm font-semibold text-[#175f91]">Bearbeiten</summary><form action={updateDelegation.bind(null,delegation.id)} className="mt-3 grid gap-3 md:grid-cols-2"><input type="hidden" name="delegatingUserId" value={delegation.delegatingUserId}/><select aria-label="Freigabe" name="scope" defaultValue={delegation.scope} className={input}>{owners.find((owner)=>owner.id===delegation.delegatingUserId)?.scopes.map((scope)=><option key={scope} value={scope}>{DELEGATION_SCOPE_LABELS[scope]}</option>)}</select><select aria-label="Stellvertreter" name="substituteUserId" defaultValue={delegation.substituteUserId} className={input}>{users.filter((user)=>user.id!==delegation.delegatingUserId).map((user)=><option key={user.id} value={user.id}>{user.name}</option>)}</select><input aria-label="Von" name="startsAt" type="datetime-local" defaultValue={localValue(delegation.startsAt)} className={input}/><input aria-label="Bis" name="endsAt" type="datetime-local" defaultValue={localValue(delegation.endsAt)} className={input}/><button className="min-h-11 rounded-md border border-[#175f91] px-3 text-sm font-semibold text-[#175f91]">Änderungen speichern</button><button formAction={cancelDelegation.bind(null,delegation.id)} className="min-h-11 rounded-md border border-red-300 px-3 text-sm font-semibold text-red-700">Stellvertretung beenden</button></form></details>:null}</Card>}) : <Card className="p-5 text-sm text-slate-500">Keine Stellvertretungen vorhanden.</Card>}</div>
+  </div>;
+}

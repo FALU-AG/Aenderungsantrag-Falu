@@ -33,6 +33,7 @@ export async function runWeeklyDigest(options: { now?: Date; ignoreSchedule?: bo
     db.user.findMany({ where: { active: true }, select: {
       id: true, email: true, name: true,
       roles: { select: { role: { select: { key: true } } } },
+      delegationsReceived: { where: { enabled: true, startsAt: { lte: now }, endsAt: { gte: now } }, orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }, { id: "asc" }], select: { scope: true, delegatingUser: { select: { name: true, active: true, roles: { select: { role: { select: { key: true } } } } } } } },
       requests: { where: { status: { not: "CLOSED" } }, orderBy: { updatedAt: "desc" }, select: { id: true, number: true, title: true, status: true, approvalCycle: true, approvals: { select: { type: true, status: true, cycle: true } } } },
       assignedTasks: { where: { status: { not: "DONE" } }, orderBy: [{ dueDate: "asc" }, { priority: "desc" }], select: { id: true, title: true, dueDate: true, priority: true, status: true, changeRequest: { select: { id: true, number: true, title: true } } } },
     } }),
@@ -44,9 +45,10 @@ export async function runWeeklyDigest(options: { now?: Date; ignoreSchedule?: bo
     const explicitRoles = new Set(user.roles.map(({ role }) => role.key));
     const approvals = new Map<string, { number: string; title: string; types: string[]; url: string }>();
     for (const approval of pendingApprovals) {
-      if (approval.cycle !== approval.changeRequest.approvalCycle || !explicitRoles.has(approval.type)) continue;
+      const delegatedFor = user.delegationsReceived?.find((delegation) => delegation.scope === `${approval.type}_APPROVAL` && delegation.delegatingUser.active && delegation.delegatingUser.roles.some(({ role }) => role.key === approval.type))?.delegatingUser.name;
+      if (approval.cycle !== approval.changeRequest.approvalCycle || (!explicitRoles.has(approval.type) && !delegatedFor)) continue;
       const existing = approvals.get(approval.changeRequest.id) ?? { number: approval.changeRequest.number, title: approval.changeRequest.title, types: [], url: appUrl(`/change-requests/${approval.changeRequest.id}?tab=Freigaben`) };
-      existing.types.push(approval.type === "AVOR" ? "AVOR" : "Technik");
+      existing.types.push(`${approval.type === "AVOR" ? "AVOR" : "Technik"}${!explicitRoles.has(approval.type) && delegatedFor ? ` (Stellvertretung für ${delegatedFor})` : ""}`);
       approvals.set(approval.changeRequest.id, existing);
     }
     const taskCount = groups.overdue.length + groups.dueThisWeek.length + groups.other.length;

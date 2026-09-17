@@ -10,6 +10,7 @@ const tx = {
   changeRequest: { findUniqueOrThrow: vi.fn().mockResolvedValue(request) },
   user: { findMany: vi.fn() },
   task: { findUniqueOrThrow: vi.fn() },
+  approvalDelegation: { findMany: vi.fn() },
 };
 
 describe("workflow notification orchestration", () => {
@@ -19,6 +20,13 @@ describe("workflow notification orchestration", () => {
     mocks.queue.mockImplementation(async (_tx, input) => ({ id: input.idempotencyKey }));
     mocks.activeRoleRecipients.mockImplementation(async (_tx, role) => role === "AVOR" ? [{ id: "avor", email: "avor@falu.ch", name: "Anna AVOR" }] : [{ id: "tech", email: "tech@falu.ch", name: "Theo Technik" }]);
     mocks.requestRecipient.mockResolvedValue({ id: "applicant", email: "applicant@falu.ch", name: "Anna Antrag" });
+    tx.approvalDelegation.findMany.mockResolvedValue([]);
+  });
+
+  it("notifies an active substitute without duplicating a direct recipient", async () => {
+    tx.approvalDelegation.findMany.mockImplementation(async ({ where }) => where.scope === "AVOR_APPROVAL" ? [{ substituteUser: { id: "sub", email: "sub@falu.ch", name: "Stellvertreter" }, delegatingUser: { name: "Anna AVOR" } }] : []);
+    await queueApprovalCycleNotifications(tx as never, "cr-1", 1);
+    expect(mocks.queue).toHaveBeenCalledWith(tx, expect.objectContaining({ recipientEmail: "sub@falu.ch", templateData: expect.objectContaining({ detail: expect.stringContaining("Stellvertretung für Anna AVOR") }) }));
   });
 
   it("queues separate AVOR and Technical recipients with correct links", async () => {

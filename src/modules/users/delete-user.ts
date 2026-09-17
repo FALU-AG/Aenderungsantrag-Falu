@@ -43,6 +43,7 @@ export async function deleteUnusedUser(
     if (!eligibility.deletable) throw new Error(eligibility.reason === "SELF" ? DELETE_SELF_MESSAGE : eligibility.reason === "BUSINESS_HISTORY" ? USER_HAS_BUSINESS_HISTORY_MESSAGE : "Es muss mindestens ein aktiver Administrator vorhanden sein.");
 
     await tx.session.deleteMany({ where: { userId: targetUserId } });
+    await tx.approvalDelegation?.deleteMany({ where: { OR: [{ delegatingUserId: targetUserId }, { substituteUserId: targetUserId }, { createdById: targetUserId }] } });
     await tx.userRole.deleteMany({ where: { userId: targetUserId } });
     await tx.auditEvent.create({
       data: {

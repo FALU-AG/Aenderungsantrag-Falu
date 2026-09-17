@@ -5,7 +5,13 @@ import { buildPersonalInbox } from "./domain";
 
 const load = cache(async (userId: string, rolesKey: string) => {
   const roles = rolesKey.split(",").filter(Boolean) as RoleKey[];
-  const hasWorkflowRole = roles.includes("AVOR") || roles.includes("TECHNICAL");
+  const now = new Date();
+  const delegations = await db.approvalDelegation.findMany({ where: { substituteUserId: userId, enabled: true, startsAt: { lte: now }, endsAt: { gte: now }, delegatingUser: { active: true }, substituteUser: { active: true } }, orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }, { id: "asc" }], select: { scope: true, delegatingUser: { select: { name: true, roles: { select: { role: { select: { key: true } } } } } } } });
+  const delegatedApprovals = delegations.flatMap((delegation) => {
+    const type = delegation.scope === "AVOR_APPROVAL" ? "AVOR" as const : "TECHNICAL" as const;
+    return delegation.delegatingUser.roles.some(({ role }) => role.key === type) ? [{ type, delegatingUserName: delegation.delegatingUser.name }] : [];
+  });
+  const hasWorkflowRole = roles.includes("AVOR") || roles.includes("TECHNICAL") || delegatedApprovals.length > 0;
   const [tasks, requests] = await Promise.all([
     db.task.findMany({
       where: { responsibleUserId: userId, status: { not: "DONE" } },
@@ -52,7 +58,7 @@ const load = cache(async (userId: string, rolesKey: string) => {
           },
         }),
   ]);
-  return buildPersonalInbox({ userId, roles, requests, tasks });
+  return buildPersonalInbox({ userId, roles, requests, tasks, delegatedApprovals });
 });
 
 export function loadPersonalInbox(user: Pick<AuthUser, "id" | "roles">) {

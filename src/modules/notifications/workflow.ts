@@ -44,9 +44,19 @@ export async function queueCompletedRequestBroadcast(tx: Prisma.TransactionClien
 export async function queueApprovalCycleNotifications(tx: Prisma.TransactionClient, requestId: string, cycle: number) {
   const request = await requestSummary(tx, requestId);
   const ids: string[] = [];
-  for (const type of ["AVOR", "TECHNICAL"] as const) for (const recipient of await activeRoleRecipients(tx, type)) {
-    const row = await queueNotification(tx, { type: type === "AVOR" ? "APPROVAL_REQUIRED_AVOR" : "APPROVAL_REQUIRED_TECHNICAL", idempotencyKey: `approval:${requestId}:${cycle}:${type}:${recipient.id}`, recipientUserId: recipient.id, recipientEmail: recipient.email, recipientName: recipient.name, changeRequestId: requestId, subject: `${type === "AVOR" ? "Freigabe erforderlich" : "Technische Freigabe erforderlich"} | ${request.number}`, templateData: { number: request.number, title: request.title, machineTypes: request.machineTypes.map(({ machineType }) => machineType.code).join(", "), applicantName: request.applicantName, status: STATUS_LABELS[request.status], detail: type === "AVOR" ? "Bitte AVOR-Freigabe prüfen." : "Bitte technische Freigabe prüfen.", url: appUrl(`/change-requests/${requestId}?tab=Freigaben`) } });
+  const now = new Date();
+  for (const type of ["AVOR", "TECHNICAL"] as const) {
+    const [directRecipients, delegations] = await Promise.all([
+      activeRoleRecipients(tx, type),
+      tx.approvalDelegation.findMany({ where: { scope: type === "AVOR" ? "AVOR_APPROVAL" : "TECHNICAL_APPROVAL", enabled: true, startsAt: { lte: now }, endsAt: { gte: now }, substituteUser: { active: true }, delegatingUser: { active: true, roles: { some: { role: { key: type } } } } }, select: { substituteUser: { select: { id: true, email: true, name: true } }, delegatingUser: { select: { name: true } } } }),
+    ]);
+    const recipients = new Map(directRecipients.map((recipient) => [recipient.id, { ...recipient, delegatedFor: null as string | null }]));
+    for (const delegation of delegations) if (!recipients.has(delegation.substituteUser.id)) recipients.set(delegation.substituteUser.id, { ...delegation.substituteUser, delegatedFor: delegation.delegatingUser.name });
+    for (const recipient of recipients.values()) {
+    const baseDetail = type === "AVOR" ? "Bitte AVOR-Freigabe prüfen." : "Bitte technische Freigabe prüfen.";
+    const row = await queueNotification(tx, { type: type === "AVOR" ? "APPROVAL_REQUIRED_AVOR" : "APPROVAL_REQUIRED_TECHNICAL", idempotencyKey: `approval:${requestId}:${cycle}:${type}:${recipient.id}`, recipientUserId: recipient.id, recipientEmail: recipient.email, recipientName: recipient.name, changeRequestId: requestId, subject: `${type === "AVOR" ? "Freigabe erforderlich" : "Technische Freigabe erforderlich"} | ${request.number}`, templateData: { number: request.number, title: request.title, machineTypes: request.machineTypes.map(({ machineType }) => machineType.code).join(", "), applicantName: request.applicantName, status: STATUS_LABELS[request.status], detail: `${baseDetail}${recipient.delegatedFor ? ` Stellvertretung für ${recipient.delegatedFor}.` : ""}`, url: appUrl(`/change-requests/${requestId}?tab=Freigaben`) } });
     ids.push(row.id);
+    }
   }
   return ids;
 }

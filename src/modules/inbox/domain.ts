@@ -63,6 +63,7 @@ export type InboxItem = {
   dueDate: Date | null;
   priority: TaskRef["priority"] | null;
   overdue: boolean;
+  delegatedFor?: string;
 };
 
 const activeApproval = (
@@ -102,17 +103,21 @@ export function buildPersonalInbox({
   roles,
   requests,
   tasks,
+  delegatedApprovals = [],
   now = new Date(),
 }: {
   userId: string;
   roles: readonly RoleKey[];
   requests: RequestRef[];
   tasks: TaskRef[];
+  delegatedApprovals?: Array<{ type: "AVOR" | "TECHNICAL"; delegatingUserName: string }>;
   now?: Date;
 }): InboxItem[] {
   const items: InboxItem[] = [];
   const avor = roles.includes("AVOR");
   const technical = roles.includes("TECHNICAL");
+  const delegated = new Map<"AVOR" | "TECHNICAL", string>();
+  for (const item of delegatedApprovals) if (!delegated.has(item.type)) delegated.set(item.type, item.delegatingUserName);
 
   for (const request of requests) {
     if (request.status === "CLOSED") continue;
@@ -131,7 +136,7 @@ export function buildPersonalInbox({
     const technicalApproval = activeApproval(request, "TECHNICAL");
 
     if (
-      avor &&
+      (avor || delegated.has("AVOR")) &&
       request.status === "UNDER_REVIEW" &&
       avorApproval?.status === "PENDING"
     )
@@ -142,10 +147,11 @@ export function buildPersonalInbox({
           typeLabel: "Freigabe",
           action: "AVOR-Freigabe erforderlich",
           href: `/change-requests/${request.id}?tab=Freigaben`,
+          ...(avor ? {} : { delegatedFor: delegated.get("AVOR") }),
         }),
       );
     if (
-      technical &&
+      (technical || delegated.has("TECHNICAL")) &&
       request.status === "UNDER_REVIEW" &&
       technicalApproval?.status === "PENDING"
     )
@@ -156,6 +162,7 @@ export function buildPersonalInbox({
           typeLabel: "Freigabe",
           action: "Technische Freigabe erforderlich",
           href: `/change-requests/${request.id}?tab=Freigaben`,
+          ...(technical ? {} : { delegatedFor: delegated.get("TECHNICAL") }),
         }),
       );
     if (

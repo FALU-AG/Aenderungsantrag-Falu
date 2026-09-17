@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ClipboardList, Gauge, ListTodo, LogOut, Settings } from "lucide-react";
+import { ClipboardList, Gauge, ListTodo, LogOut, Settings, UserRoundCog } from "lucide-react";
 import type { AuthUser } from "@/modules/auth";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { CreateChangeRequestCta } from "./create-change-request-cta";
@@ -14,12 +14,14 @@ const navigation = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/change-requests", label: "Änderungsanträge", icon: "change-requests" },
   { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: "tasks" },
+  { href: "/delegations", label: "Stellvertretung", icon: "delegations" },
 ] satisfies NavigationItem[];
 
 const navigationIcons = {
   dashboard: Gauge,
   "change-requests": ClipboardList,
   tasks: ListTodo,
+  delegations: UserRoundCog,
   administration: Settings,
 } satisfies Record<NavigationItem["icon"], typeof Gauge>;
 

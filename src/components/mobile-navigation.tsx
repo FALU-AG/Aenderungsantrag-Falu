@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardList, Gauge, ListTodo, Menu, Settings, X } from "lucide-react";
+import { ClipboardList, Gauge, ListTodo, Menu, Settings, UserRoundCog, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export type NavigationIcon = "dashboard" | "change-requests" | "tasks" | "administration";
+export type NavigationIcon = "dashboard" | "change-requests" | "tasks" | "delegations" | "administration";
 export type NavigationItem = { href: string; label: string; icon: NavigationIcon; count?: number };
 
 const navigationIcons = {
   dashboard: Gauge,
   "change-requests": ClipboardList,
   tasks: ListTodo,
+  delegations: UserRoundCog,
   administration: Settings,
 } satisfies Record<NavigationIcon, typeof Gauge>;
 

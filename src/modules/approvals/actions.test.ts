@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn(), transaction: vi.fn(), revalidatePath: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn(), transaction: vi.fn(), revalidatePath: vi.fn(), findDelegation: vi.fn() }));
 vi.mock("@/modules/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
-vi.mock("@/server/db/client", () => ({ db: { $transaction: mocks.transaction } }));
+vi.mock("@/server/db/client", () => ({ db: { $transaction: mocks.transaction, approvalDelegation: { findFirst: mocks.findDelegation } } }));
 
 import { decideApproval } from "./actions";
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "technical-1", name: "Thomas Technik", roles: ["TECHNICAL"] });
+  mocks.findDelegation.mockResolvedValue(null);
 });
 
 describe("Freigabeaktionen", () => {
@@ -44,5 +45,18 @@ describe("Freigabeaktionen", () => {
     mocks.transaction.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
     const form = new FormData(); form.set("decision", "APPROVED");
     expect(await decideApproval("cr-1", "TECHNICAL", {}, form)).toEqual({ error: "Der Antrag befindet sich nicht mehr in Prüfung." });
+  });
+
+  it("records the actual actor, represented user and delegation for a delegated decision", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "sub", name: "Max Bodmer", roles: ["EMPLOYEE"] });
+    mocks.findDelegation.mockResolvedValue({ id: "delegation-1", delegatingUserId: "owner", delegatingUser: { name: "Florian Kaufmann" } });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const auditCreate = vi.fn();
+    const tx = { changeRequest: { findUniqueOrThrow: vi.fn(async()=>({status:"UNDER_REVIEW",approvalCycle:1})), updateMany: vi.fn() }, approval: { findUniqueOrThrow: vi.fn(async()=>({id:"a1",status:"PENDING"})), updateMany, findMany: vi.fn(async()=>[{status:"PENDING"},{status:"APPROVED"}]) }, auditEvent: { create: auditCreate } };
+    mocks.transaction.mockImplementation(async (callback: (client: typeof tx)=>unknown)=>callback(tx));
+    const form = new FormData(); form.set("decision","APPROVED");
+    expect(await decideApproval("cr-1","AVOR",{},form)).toEqual({success:true});
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({decisionUserId:"sub",representedUserId:"owner",delegationId:"delegation-1"})}));
+    expect(auditCreate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({summary:expect.stringContaining("als Stellvertreter von Florian Kaufmann")})}));
   });
 });

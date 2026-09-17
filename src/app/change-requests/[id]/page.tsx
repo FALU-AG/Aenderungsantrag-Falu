@@ -23,7 +23,6 @@ import {
 } from "@/modules/change-requests/actions";
 import {
   APPROVAL_LABELS,
-  canDecideApproval,
   type ApprovalStatusKey,
   type ApprovalTypeKey,
 } from "@/modules/approvals/domain";
@@ -65,6 +64,7 @@ import { withBasePath } from "@/lib/app-paths";
 import { DeleteChangeRequestAction } from "@/components/delete-change-request-action";
 import { RequestWorkflowNavigation } from "@/components/request-workflow-navigation";
 import { deriveWorkflowStages } from "@/modules/workflow/navigation";
+import { resolveApprovalAuthority } from "@/modules/delegations/authorization";
 const formatDate = formatDateTimeZurich;
 type ApprovalView = {
   id: string;
@@ -74,6 +74,7 @@ type ApprovalView = {
   comment: string | null;
   decidedAt: Date | null;
   decisionUser: { name: string } | null;
+  representedUser: { name: string } | null;
 };
 
 export default async function RequestDetailPage({
@@ -91,7 +92,7 @@ export default async function RequestDetailPage({
       machineTypes: { include: { machineType: true }, orderBy: { machineType: { code: "asc" } } },
       reasons: { include: { changeReason: true } },
       approvals: {
-        include: { decisionUser: true },
+        include: { decisionUser: true, representedUser: true },
         orderBy: [{ cycle: "desc" }, { type: "asc" }],
       },
       finalApprovals: {
@@ -149,6 +150,7 @@ export default async function RequestDetailPage({
     avorReview: request.avorImpactReview,
     purchasingReview: request.purchasingReview,
   });
+  const approvalAuthorities = Object.fromEntries(await Promise.all((["AVOR", "TECHNICAL"] as const).map(async (type) => [type, await resolveApprovalAuthority(user, type)]))) as Record<ApprovalTypeKey, Awaited<ReturnType<typeof resolveApprovalAuthority>>>;
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4 sm:mb-6">
@@ -222,7 +224,7 @@ export default async function RequestDetailPage({
           current={current}
           previousCycles={previousCycles}
           all={request.approvals}
-          user={user}
+          authorities={approvalAuthorities}
           requestStatus={request.status}
         />
       ) : tab === "Technische Prüfung" ? (
@@ -882,7 +884,7 @@ function Approvals({
   current,
   previousCycles,
   all,
-  user,
+  authorities,
   requestStatus,
 }: {
   requestId: string;
@@ -890,7 +892,7 @@ function Approvals({
   current: ApprovalView[];
   previousCycles: number[];
   all: ApprovalView[];
-  user: Parameters<typeof canDecideApproval>[0];
+  authorities: Record<ApprovalTypeKey, Awaited<ReturnType<typeof resolveApprovalAuthority>>>;
   requestStatus: string;
 }) {
   return (
@@ -912,9 +914,10 @@ function Approvals({
                 currentCycle={cycle}
                 requestStatus={requestStatus}
                 decisionUser={a.decisionUser?.name}
+                representedUser={a.representedUser?.name}
                 decidedAt={a.decidedAt ? formatDate(a.decidedAt) : null}
                 comment={a.comment}
-                canDecide={canDecideApproval(user, type)}
+                canDecide={authorities[type].allowed}
               />
             ) : (
               <Card key={type} className="p-6">
