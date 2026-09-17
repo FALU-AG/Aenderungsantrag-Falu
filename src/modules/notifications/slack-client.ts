@@ -1,5 +1,5 @@
 export type SlackBlock = Record<string, unknown>;
-export type SlackPayload = { toEmail: string; text: string; blocks?: SlackBlock[] };
+export type SlackPayload = { toEmail: string; recipientName?: string | null; text: string; blocks?: SlackBlock[] };
 export type SlackProvider = {
   send(payload: SlackPayload): Promise<{ id: string }>;
   check(): Promise<{ botId: string; team?: string }>;
@@ -15,6 +15,35 @@ function enabled(env: SlackEnvironment) {
   return value === "true";
 }
 
+type SlackNotificationMode = "production" | "test" | "invalid";
+
+function notificationMode(env: SlackEnvironment): SlackNotificationMode {
+  const value = env.SLACK_NOTIFICATION_MODE?.trim().toLowerCase();
+  if (!value || value === "production") return "production";
+  if (value === "test") return "test";
+  return "invalid";
+}
+
+function originalRecipient(payload: SlackPayload) {
+  const email = payload.toEmail.trim();
+  const name = payload.recipientName?.trim();
+  if (name && email) return `${name} (${email})`;
+  return name || email || "Unbekannt";
+}
+
+function testPayload(payload: SlackPayload) {
+  const recipient = originalRecipient(payload);
+  const banner = `🧪 TESTMODUS\nUrsprünglicher Empfänger: ${recipient}`;
+  return {
+    text: `${banner}\n\n${payload.text}`,
+    blocks: [
+      { type: "section", text: { type: "mrkdwn", text: `*🧪 TESTMODUS*\nUrsprünglicher Empfänger: ${recipient.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}` } },
+      { type: "divider" },
+      ...(payload.blocks ?? []),
+    ],
+  };
+}
+
 async function slackApi<T extends { ok: boolean; error?: string }>(method: string, token: string, fetcher: Fetch, init?: RequestInit) {
   const response = await fetcher(`https://slack.com/api/${method}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json; charset=utf-8", ...init?.headers } });
   if (!response.ok) throw new Error(`Slack API nicht erreichbar (${response.status}).`);
@@ -28,8 +57,15 @@ async function slackApi<T extends { ok: boolean; error?: string }>(method: strin
 
 export function createSlackProvider(env: SlackEnvironment = process.env, fetcher: Fetch = fetch): SlackProvider {
   if (!enabled(env)) return { send: async () => ({ id: "disabled" }), check: async () => ({ botId: "disabled" }) };
+  const mode = notificationMode(env);
+  const testRecipient = env.SLACK_TEST_RECIPIENT_USER_ID?.trim();
+  const suppressionReason = mode === "invalid"
+    ? "Slack delivery suppressed: SLACK_NOTIFICATION_MODE has an unsupported value."
+    : mode === "test" && !testRecipient
+      ? "Slack delivery suppressed: SLACK_TEST_RECIPIENT_USER_ID is missing in test mode."
+      : null;
   const token = env.SLACK_BOT_TOKEN;
-  if (!token) throw new Error("Slack ist aktiviert, aber SLACK_BOT_TOKEN fehlt.");
+  if (!token && !suppressionReason) throw new Error("Slack ist aktiviert, aber SLACK_BOT_TOKEN fehlt.");
 
   async function resolveUserId(email: string) {
     const normalized = email.trim().toLowerCase();
@@ -43,12 +79,18 @@ export function createSlackProvider(env: SlackEnvironment = process.env, fetcher
 
   return {
     async send(payload) {
-      const channel = await resolveUserId(payload.toEmail);
-      const result = await slackApi<{ ok: boolean; error?: string; ts?: string }>("chat.postMessage", token, fetcher, { method: "POST", body: JSON.stringify({ channel, text: payload.text, blocks: payload.blocks }) });
+      if (suppressionReason) {
+        console.error(suppressionReason);
+        return { id: "disabled" };
+      }
+      const channel = mode === "test" ? testRecipient! : await resolveUserId(payload.toEmail);
+      const message = mode === "test" ? testPayload(payload) : payload;
+      const result = await slackApi<{ ok: boolean; error?: string; ts?: string }>("chat.postMessage", token!, fetcher, { method: "POST", body: JSON.stringify({ channel, text: message.text, blocks: message.blocks }) });
       if (!result.ts) throw new Error("Slack lieferte keine Nachrichten-ID.");
       return { id: `slack:${channel}:${result.ts}` };
     },
     async check() {
+      if (!token) throw new Error("Slack ist aktiviert, aber SLACK_BOT_TOKEN fehlt.");
       const result = await slackApi<{ ok: boolean; error?: string; bot_id?: string; team?: string }>("auth.test", token, fetcher, { method: "POST", body: "{}" });
       if (!result.bot_id) throw new Error("Slack lieferte keine Bot-Identität.");
       return { botId: result.bot_id, team: result.team };

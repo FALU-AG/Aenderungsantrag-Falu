@@ -148,6 +148,8 @@ Erforderliche Railway-Variablen:
 ```env
 SLACK_BOT_TOKEN="xoxb-..."
 SLACK_NOTIFICATIONS_ENABLED="true"
+SLACK_NOTIFICATION_MODE="production"
+SLACK_TEST_RECIPIENT_USER_ID=""
 RESEND_API_KEY="..."
 RESEND_WEBHOOK_SECRET="..."
 EMAIL_FROM="FALU Change Request <change-request@bestätigte-domain>"
@@ -156,7 +158,7 @@ EMAIL_REDIRECT_TO="kontrolliertes-testpostfach@..."
 APP_BASE_URL="https://admin.falu.com/aenderungsantrag"
 ```
 
-Der Slack Bot benötigt die OAuth-Scopes `chat:write`, `users:read` und `users:read.email`. `SLACK_BOT_TOKEN` ist ausschließlich serverseitig und darf nie als `NEXT_PUBLIC_`-Variable gesetzt werden. Mit `SLACK_NOTIFICATIONS_ENABLED=false` erfolgen keine externen Slack-Aufrufe. Die Verbindung und Bot-Identität können ohne Testnachricht geprüft werden:
+Der Slack Bot benötigt die OAuth-Scopes `chat:write`, `users:read` und `users:read.email`. `SLACK_BOT_TOKEN` ist ausschließlich serverseitig und darf nie als `NEXT_PUBLIC_`-Variable gesetzt werden. Mit `SLACK_NOTIFICATIONS_ENABLED=false` erfolgen keine externen Slack-Aufrufe. `SLACK_NOTIFICATION_MODE=production` verwendet die normale E-Mail-zu-Slack-Auflösung. `SLACK_NOTIFICATION_MODE=test` leitet jede logische Nachricht direkt an die Slack User ID in `SLACK_TEST_RECIPIENT_USER_ID` um und kennzeichnet den ursprünglichen Empfänger; fehlt die Test-ID oder ist der Modus ungültig, wird sicher nichts versendet. Ein fehlender Modus entspricht aus Abwärtskompatibilität `production`. Die Verbindung und Bot-Identität können ohne Testnachricht geprüft werden:
 
 ```bash
 npm run slack:check

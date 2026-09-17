@@ -23,8 +23,14 @@ describe("notification channel routing", () => {
     const email = { send: vi.fn() };
     const slack = { send: vi.fn().mockResolvedValue({ id: "slack" }), check: vi.fn() };
     const url = "https://admin.falu.com/aenderungsantrag/change-requests/cr-1";
-    await createNotificationDeliveryProvider({ email, slack }).send({ type: "TASK_ASSIGNED", recipientEmail: "user@falu.ch", subject: "Aufgabe", idempotencyKey: "task:1", data: { number: "CR-2026-001", title: "Zeichnung", url } });
-    expect(slack.send).toHaveBeenCalledWith(expect.objectContaining({ toEmail: "user@falu.ch", blocks: expect.arrayContaining([expect.objectContaining({ type: "actions", elements: [expect.objectContaining({ url })] })]) }));
+    await createNotificationDeliveryProvider({ email, slack }).send({ type: "TASK_ASSIGNED", recipientEmail: "user@falu.ch", recipientName: "Erika Beispiel", subject: "Aufgabe", idempotencyKey: "task:1", data: { number: "CR-2026-001", title: "Zeichnung", url } });
+    expect(slack.send).toHaveBeenCalledWith(expect.objectContaining({ toEmail: "user@falu.ch", recipientName: "Erika Beispiel", blocks: expect.arrayContaining([expect.objectContaining({ type: "actions", elements: [expect.objectContaining({ url })] })]) }));
     expect(email.send).not.toHaveBeenCalled();
+  });
+
+  it.each(["APPROVAL_REQUIRED_AVOR", "REQUEST_CLOSED", "WEEKLY_TASK_DIGEST", "REQUEST_PHASE_CHANGED"] as const)("routes %s through the shared Slack provider", async (type) => {
+    const slack = { send: vi.fn().mockResolvedValue({id:"slack"}), check:vi.fn() };
+    await createNotificationDeliveryProvider({email:{send:vi.fn()},slack}).send({type,recipientEmail:"recipient@falu.ch",recipientName:"Recipient",subject:"Test",idempotencyKey:`test:${type}`,data:{delegationEvent:type==="REQUEST_PHASE_CHANGED"?"CREATED":undefined}});
+    expect(slack.send).toHaveBeenCalledOnce();
   });
 });

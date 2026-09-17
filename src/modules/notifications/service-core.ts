@@ -8,7 +8,7 @@ export async function sendNotification(id: string, options: { provider?: Notific
   const data = { ...((notification.templateData ?? {}) as NotificationTemplateData), ...(options.sensitiveData ?? {}) };
   if (notification.type === "PASSWORD_RESET" && !data.url) return false;
   try {
-    const result = await (options.provider ?? createNotificationDeliveryProvider()).send({ type: notification.type, recipientEmail: notification.recipientEmail, subject: notification.subject, data, idempotencyKey: notification.idempotencyKey });
+    const result = await (options.provider ?? createNotificationDeliveryProvider()).send({ type: notification.type, recipientEmail: notification.recipientEmail, recipientName: notification.recipientName, subject: notification.subject, data, idempotencyKey: notification.idempotencyKey });
     await db.emailNotification.update({ where: { id }, data: { status: "SENT", providerMessageId: result.id === "disabled" ? null : result.id, sentAt: new Date(), failedAt: null, lastError: null, attemptCount: { increment: 1 } } });
     return true;
   } catch (error) {
