@@ -18,6 +18,18 @@ const value = (input: unknown) => typeof input === "string" || typeof input === 
 const escapeSlack = (input: unknown) => value(input).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export function renderSlackNotification(type: EmailNotificationType, subject: string, data: NotificationTemplateData) {
+  if (value(data.delegationEvent)) {
+    const blocks: SlackBlock[] = [
+      { type: "header", text: { type: "plain_text", text: value(data.heading) || subject, emoji: true } },
+      { type: "section", text: { type: "mrkdwn", text: escapeSlack(data.detail) } },
+    ];
+    if (value(data.period) || value(data.scope)) blocks.push({ type: "section", fields: [
+      ...(value(data.period) ? [{ type: "mrkdwn" as const, text: `*Zeitraum*\n${escapeSlack(data.period)}` }] : []),
+      ...(value(data.scope) ? [{ type: "mrkdwn" as const, text: `*Bereich*\n${escapeSlack(data.scope)}` }] : []),
+    ] });
+    if (data.url) blocks.push({ type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "FALU Change Request öffnen" }, url: value(data.url), action_id: "open_falu_change_request" }] });
+    return { text: `${value(data.heading) || subject}: ${value(data.delegatorName)}`, blocks };
+  }
   const heading = value(data.number) ? `Änderungsantrag ${value(data.number)}` : labels[type] ?? subject;
   const fields = [
     ["Titel", data.title],

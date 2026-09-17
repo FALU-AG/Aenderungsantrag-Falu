@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { renderSlackNotification } from "./slack-template";
 
 describe("Slack notification presentation", () => {
+  it("renders a delegation message with period, scope and application action", () => {
+    const rendered = renderSlackNotification("REQUEST_PHASE_CHANGED", "Stellvertretung eingerichtet", { delegationEvent: "CREATED", heading: "Stellvertretung eingerichtet", delegatorName: "Florian Kaufmann", detail: "Florian Kaufmann hat dich als Stellvertreter eingetragen.", period: "21.09.2026 – 04.10.2026", scope: "Technische Freigaben", url: "https://admin.falu.com/aenderungsantrag/meine-aufgaben" });
+    expect(JSON.stringify(rendered.blocks)).toContain("Florian Kaufmann");
+    expect(JSON.stringify(rendered.blocks)).toContain("21.09.2026 – 04.10.2026");
+    expect(JSON.stringify(rendered.blocks)).toContain("Technische Freigaben");
+    expect(JSON.stringify(rendered.blocks)).toContain("FALU Change Request öffnen");
+  });
   it("renders all personal weekly digest sections", () => {
     const rendered = renderSlackNotification("WEEKLY_TASK_DIGEST", "Wochenübersicht", {
       greetingName: "Anna Beispiel",

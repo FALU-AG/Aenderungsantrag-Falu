@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ApprovalTypeKey } from "@/modules/approvals/domain";
+import type { RoleKey } from "@/modules/auth";
 
 export type DelegationScopeKey = "AVOR_APPROVAL" | "TECHNICAL_APPROVAL";
 export const DELEGATION_SCOPE_LABELS: Record<DelegationScopeKey, string> = {
@@ -11,6 +12,30 @@ export const scopeForApproval = (type: ApprovalTypeKey): DelegationScopeKey =>
   type === "AVOR" ? "AVOR_APPROVAL" : "TECHNICAL_APPROVAL";
 export const roleForScope = (scope: DelegationScopeKey) =>
   scope === "AVOR_APPROVAL" ? "AVOR" : "TECHNICAL";
+
+export function delegatableScopes(roles: readonly RoleKey[]): DelegationScopeKey[] {
+  return [
+    ...(roles.includes("AVOR") ? ["AVOR_APPROVAL" as const] : []),
+    ...(roles.includes("TECHNICAL") ? ["TECHNICAL_APPROVAL" as const] : []),
+  ];
+}
+
+export function canManageOwnDelegations(roles: readonly RoleKey[]) {
+  return delegatableScopes(roles).length > 0;
+}
+
+export function canManageDelegation(actor: { id: string; roles: readonly RoleKey[] }, delegatingUserId: string, scope: DelegationScopeKey) {
+  if (actor.id !== delegatingUserId) return actor.roles.includes("ADMINISTRATOR");
+  return delegatableScopes(actor.roles).includes(scope);
+}
+
+export function delegationMateriallyChanged(existing: { substituteUserId: string; scope: DelegationScopeKey; startsAt: Date; endsAt: Date }, next: { substituteUserId: string; scope: DelegationScopeKey; startsAt: Date; endsAt: Date }) {
+  return existing.substituteUserId !== next.substituteUserId || existing.scope !== next.scope || existing.startsAt.getTime() !== next.startsAt.getTime() || existing.endsAt.getTime() !== next.endsAt.getTime();
+}
+
+export function shouldNotifyManualCancellation(input: { enabled: boolean; endsAt: Date }, now = new Date()) {
+  return input.enabled && input.endsAt > now;
+}
 
 export const delegationInputSchema = z.object({
   delegatingUserId: z.string().min(1),

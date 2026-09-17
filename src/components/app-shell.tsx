@@ -9,12 +9,12 @@ import { logout } from "@/modules/auth/actions";
 import { roleSummary } from "@/modules/users/domain";
 import { loadPersonalInbox } from "@/modules/inbox/query";
 import { MobileNavigation, type NavigationItem } from "./mobile-navigation";
+import { canManageOwnDelegations } from "@/modules/delegations/domain";
 
 const navigation = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/change-requests", label: "Änderungsanträge", icon: "change-requests" },
   { href: "/meine-aufgaben", label: "Meine Aufgaben", icon: "tasks" },
-  { href: "/delegations", label: "Stellvertretung", icon: "delegations" },
 ] satisfies NavigationItem[];
 
 const navigationIcons = {
@@ -33,7 +33,11 @@ export async function AppShell({
   children: React.ReactNode;
 }) {
   const inboxCount = (await loadPersonalInbox(user)).length;
-  const items: NavigationItem[] = [...navigation.map((item) => ({...item, count: item.href === "/meine-aufgaben" ? inboxCount : undefined})), ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/users", label: "Administration", icon: "administration" as const }] : [])];
+  const items: NavigationItem[] = [
+    ...navigation.map((item) => ({...item, count: item.href === "/meine-aufgaben" ? inboxCount : undefined})),
+    ...(canManageOwnDelegations(user.roles) ? [{ href: "/delegations", label: "Stellvertretung", icon: "delegations" as const }] : []),
+    ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/users", label: "Administration", icon: "administration" as const }] : []),
+  ];
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
