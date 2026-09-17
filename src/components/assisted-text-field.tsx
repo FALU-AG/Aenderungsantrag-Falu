@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mic, Sparkles, Square } from "lucide-react";
 import { formulateText, transcribeSpeech } from "@/modules/assist/actions";
 import {
   applyAcceptedSuggestion,
+  appendTranscription,
   microphoneAccessMessage,
+  microphoneUnsupportedMessage,
 } from "@/modules/assist/behavior";
 
 type Props = {
@@ -40,7 +42,17 @@ export function AssistedTextField({
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
+  const recordingStream = useRef<MediaStream | null>(null);
+
+  useEffect(
+    () => () => {
+      if (recorder.current?.state === "recording") recorder.current.stop();
+      recordingStream.current?.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
 
   async function formulate() {
     setBusy(true);
@@ -60,11 +72,12 @@ export function AssistedTextField({
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      setMessage(microphoneAccessMessage);
+      setMessage(microphoneUnsupportedMessage);
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStream.current = stream;
       const chunks: Blob[] = [];
       const mediaRecorder = new MediaRecorder(stream);
       recorder.current = mediaRecorder;
@@ -73,25 +86,35 @@ export function AssistedTextField({
       mediaRecorder.onstop = async () => {
         setRecording(false);
         stream.getTracks().forEach((track) => track.stop());
-        setBusy(true);
-        const data = new FormData();
-        data.set(
-          "audio",
-          new File(chunks, "aufnahme.webm", {
-            type: mediaRecorder.mimeType || "audio/webm",
-          }),
-        );
-        const result = await transcribeSpeech(data);
-        if (result.text)
-          setValue((current) =>
-            [current.trim(), result.text].filter(Boolean).join(" "),
+        recordingStream.current = null;
+        recorder.current = null;
+        const mimeType = mediaRecorder.mimeType || "audio/webm";
+        const audio = new File(chunks, "aufnahme", { type: mimeType });
+        if (audio.size === 0) {
+          setMessage("Die Aufnahme ist leer. Bitte versuchen Sie es erneut.");
+          return;
+        }
+
+        setTranscribing(true);
+        setMessage("Wird transkribiert…");
+        try {
+          const data = new FormData();
+          data.set("audio", audio);
+          const result = await transcribeSpeech(data);
+          if (result.text)
+            setValue((current) => appendTranscription(current, result.text!));
+          setMessage(result.message);
+        } catch {
+          setMessage(
+            "Die Aufnahme konnte nicht übertragen werden. Bitte versuchen Sie es erneut.",
           );
-        setMessage(result.message);
-        setBusy(false);
+        } finally {
+          setTranscribing(false);
+        }
       };
       mediaRecorder.start();
       setRecording(true);
-      setMessage("Aufnahme läuft …");
+      setMessage("Aufnahme läuft…");
     } catch {
       setMessage(microphoneAccessMessage);
     }
@@ -128,7 +151,7 @@ export function AssistedTextField({
           <button
             type="button"
             onClick={formulate}
-            disabled={busy}
+            disabled={busy || recording || transcribing}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
           >
             <Sparkles className="size-4" aria-hidden="true" />
@@ -137,7 +160,7 @@ export function AssistedTextField({
           <button
             type="button"
             onClick={toggleRecording}
-            disabled={busy}
+            disabled={busy || transcribing}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
           >
             {recording ? (
@@ -145,7 +168,11 @@ export function AssistedTextField({
             ) : (
               <Mic className="size-4" aria-hidden="true" />
             )}
-            {recording ? "Aufnahme stoppen" : "Spracheingabe"}
+            {recording
+              ? "Aufnahme stoppen"
+              : transcribing
+                ? "Wird transkribiert…"
+                : "Spracheingabe"}
           </button>
         </div>
       )}

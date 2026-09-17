@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyAcceptedSuggestion, microphoneAccessMessage } from "./behavior";
+import {
+  applyAcceptedSuggestion,
+  appendTranscription,
+  microphoneAccessMessage,
+} from "./behavior";
 import { getWritingProvider } from "@/modules/ai/provider";
 import { getSpeechProvider } from "@/modules/speech/provider";
 
@@ -10,6 +14,15 @@ describe("Text- und Spracheingabe", () => {
     );
     expect(applyAcceptedSuggestion("Original", "Vorschlag", true)).toBe(
       "Vorschlag",
+    );
+  });
+
+  it("hängt Transkriptionen an bestehenden Text an", () => {
+    expect(appendTranscription("Bestehender Text.", "Neue Spracheingabe.")).toBe(
+      "Bestehender Text. Neue Spracheingabe.",
+    );
+    expect(appendTranscription("", "Neue Spracheingabe.")).toBe(
+      "Neue Spracheingabe.",
     );
   });
 

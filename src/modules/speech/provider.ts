@@ -1,3 +1,5 @@
+import "server-only";
+
 import OpenAI from "openai";
 
 export interface SpeechProvider {
@@ -32,11 +34,17 @@ export function getSpeechProvider(
   env: Partial<Record<string, string | undefined>> = process.env,
   client?: TranscriptionClient,
 ): SpeechProvider | null {
-  if (env.SPEECH_PROVIDER === "mock") return new MockSpeechProvider();
-  if (env.SPEECH_PROVIDER === "openai") {
+  const provider = env.SPEECH_PROVIDER || env.AI_PROVIDER;
+  if (provider === "mock") return new MockSpeechProvider();
+  if (provider === "openai") {
     if (!env.OPENAI_API_KEY) return null;
     return new OpenAISpeechProvider(
-      client ?? new OpenAI({ apiKey: env.OPENAI_API_KEY }),
+      client ??
+        new OpenAI({
+          apiKey: env.OPENAI_API_KEY,
+          timeout: 30_000,
+          maxRetries: 1,
+        }),
       env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
     );
   }

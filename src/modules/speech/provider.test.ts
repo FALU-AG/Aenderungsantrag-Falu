@@ -33,4 +33,26 @@ describe("OpenAI-Spracheingabe", () => {
       ),
     ).toBeInstanceOf(OpenAISpeechProvider);
   });
+
+  it("verwendet den OpenAI-Sprachprovider aus der bestehenden AI-Konfiguration", () => {
+    const client = {
+      audio: { transcriptions: { create: vi.fn() } },
+    } as unknown as Pick<OpenAI, "audio">;
+    expect(
+      getSpeechProvider(
+        { AI_PROVIDER: "openai", OPENAI_API_KEY: "test-key" },
+        client,
+      ),
+    ).toBeInstanceOf(OpenAISpeechProvider);
+  });
+
+  it("respektiert ein explizites Speech-Provider-Override", () => {
+    expect(
+      getSpeechProvider({
+        AI_PROVIDER: "openai",
+        SPEECH_PROVIDER: "disabled",
+        OPENAI_API_KEY: "test-key",
+      }),
+    ).toBeNull();
+  });
 });
