@@ -3,23 +3,36 @@
 import { getWritingProvider } from "@/modules/ai/provider";
 import { getSessionUser } from "@/modules/auth";
 import { getSpeechProvider } from "@/modules/speech/provider";
+import {
+  isSupportedSpeechContentType,
+  MAX_SPEECH_AUDIO_BYTES,
+} from "./speech-validation";
 
 export type AssistResult = { text?: string; message?: string };
 
-export const MAX_SPEECH_AUDIO_BYTES = 10 * 1024 * 1024;
-export const SUPPORTED_SPEECH_AUDIO_TYPES = new Set([
-  "audio/flac",
-  "audio/m4a",
-  "audio/mp4",
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/mpga",
-  "audio/ogg",
-  "audio/wav",
-  "audio/webm",
-  "video/mp4",
-  "video/webm",
-]);
+function safeTranscriptionErrorDetails(error: unknown) {
+  if (!error || typeof error !== "object") return { name: "UnknownError" };
+  const record = error as Record<string, unknown>;
+  const message =
+    typeof record.message === "string"
+      ? record.message
+          .replace(/sk-[A-Za-z0-9_-]+/g, "[redacted]")
+          .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+          .slice(0, 500)
+      : undefined;
+  return {
+    name: typeof record.name === "string" ? record.name : "Error",
+    status:
+      typeof record.status === "number" || typeof record.status === "string"
+        ? record.status
+        : undefined,
+    code:
+      typeof record.code === "string" || typeof record.code === "number"
+        ? record.code
+        : undefined,
+    message,
+  };
+}
 
 export async function formulateText(
   notes: string,
@@ -56,8 +69,7 @@ export async function transcribeSpeech(
   if (audio.size > MAX_SPEECH_AUDIO_BYTES)
     return { message: "Die Aufnahme ist zu groß. Maximal erlaubt sind 10 MB." };
 
-  const contentType = audio.type.toLowerCase().split(";", 1)[0];
-  if (!SUPPORTED_SPEECH_AUDIO_TYPES.has(contentType))
+  if (!isSupportedSpeechContentType(audio.type))
     return { message: "Das Audioformat der Aufnahme wird nicht unterstützt." };
 
   const provider = getSpeechProvider();
@@ -68,8 +80,11 @@ export async function transcribeSpeech(
     const text = await provider.transcribe(audio);
     if (!text) return { message: "In der Aufnahme wurde kein Text erkannt." };
     return { text };
-  } catch {
-    console.error("Speech transcription failed.");
+  } catch (error) {
+    console.error("Speech input failed.", {
+      stage: "openai_transcription",
+      ...safeTranscriptionErrorDetails(error),
+    });
     return { message: "Die Spracheingabe konnte nicht verarbeitet werden." };
   }
 }

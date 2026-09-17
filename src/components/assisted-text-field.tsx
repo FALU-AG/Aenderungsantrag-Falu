@@ -8,6 +8,8 @@ import {
   appendTranscription,
   microphoneAccessMessage,
   microphoneUnsupportedMessage,
+  recordingFileName,
+  safeSpeechClientErrorDetails,
 } from "@/modules/assist/behavior";
 
 type Props = {
@@ -89,7 +91,9 @@ export function AssistedTextField({
         recordingStream.current = null;
         recorder.current = null;
         const mimeType = mediaRecorder.mimeType || "audio/webm";
-        const audio = new File(chunks, "aufnahme", { type: mimeType });
+        const audio = new File(chunks, recordingFileName(mimeType), {
+          type: mimeType,
+        });
         if (audio.size === 0) {
           setMessage("Die Aufnahme ist leer. Bitte versuchen Sie es erneut.");
           return;
@@ -104,7 +108,11 @@ export function AssistedTextField({
           if (result.text)
             setValue((current) => appendTranscription(current, result.text!));
           setMessage(result.message);
-        } catch {
+        } catch (error) {
+          console.error("Speech input failed.", {
+            stage: "server_action_transport",
+            ...safeSpeechClientErrorDetails(error),
+          });
           setMessage(
             "Die Aufnahme konnte nicht übertragen werden. Bitte versuchen Sie es erneut.",
           );

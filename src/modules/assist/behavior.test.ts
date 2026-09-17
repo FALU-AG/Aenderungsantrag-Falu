@@ -3,6 +3,8 @@ import {
   applyAcceptedSuggestion,
   appendTranscription,
   microphoneAccessMessage,
+  recordingFileName,
+  safeSpeechClientErrorDetails,
 } from "./behavior";
 import { getWritingProvider } from "@/modules/ai/provider";
 import { getSpeechProvider } from "@/modules/speech/provider";
@@ -24,6 +26,21 @@ describe("Text- und Spracheingabe", () => {
     expect(appendTranscription("", "Neue Spracheingabe.")).toBe(
       "Neue Spracheingabe.",
     );
+  });
+
+  it("gibt MediaRecorder-Dateien eine zum normalisierten MIME-Typ passende Endung", () => {
+    expect(recordingFileName("audio/webm;codecs=opus")).toBe("aufnahme.webm");
+    expect(recordingFileName("audio/ogg;codecs=opus")).toBe("aufnahme.ogg");
+    expect(recordingFileName("audio/mp4")).toBe("aufnahme.mp4");
+  });
+
+  it("redigiert Geheimnisse aus Transportdiagnosen", () => {
+    const fakeSecret = ["sk", "production", "secret"].join("-");
+    const details = safeSpeechClientErrorDetails(
+      new Error(`Failed with Bearer ${fakeSecret}`),
+    );
+    expect(JSON.stringify(details)).not.toContain(fakeSecret);
+    expect(details.name).toBe("Error");
   });
 
   it("bleibt ohne konfigurierte Provider verfügbar", () => {
