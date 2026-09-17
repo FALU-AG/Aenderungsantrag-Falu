@@ -160,7 +160,7 @@ export function AssistedTextField({
             type="button"
             onClick={formulate}
             disabled={busy || recording || transcribing}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91] sm:w-auto"
           >
             <Sparkles className="size-4" aria-hidden="true" />
             Mit AI formulieren
@@ -169,7 +169,7 @@ export function AssistedTextField({
             type="button"
             onClick={toggleRecording}
             disabled={busy || transcribing}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91] sm:w-auto"
           >
             {recording ? (
               <Square className="size-4" aria-hidden="true" />

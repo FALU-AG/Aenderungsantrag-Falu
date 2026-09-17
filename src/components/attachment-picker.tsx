@@ -79,6 +79,7 @@ export function AttachmentPicker({
         ref={regularInput}
         name={fieldName}
         type="file"
+        aria-label="Datei auswählen"
         multiple={multiple}
         accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx"
         className={inputClass}
@@ -88,24 +89,25 @@ export function AttachmentPicker({
         ref={cameraInput}
         name={fieldName}
         type="file"
-        accept="image/*"
+        aria-label="Foto aufnehmen"
+        accept="image/jpeg,image/png"
         capture="environment"
         className={inputClass}
         onChange={(event) => add(event.target.files)}
       />
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <button
           type="button"
           onClick={() => regularInput.current?.click()}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91] sm:w-auto"
         >
           <FilePlus2 className="size-4" aria-hidden="true" />
-          Datei hinzufügen
+          Datei auswählen
         </button>
         <button
           type="button"
           onClick={() => cameraInput.current?.click()}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91] sm:w-auto"
         >
           <Camera className="size-4" aria-hidden="true" />
           Foto aufnehmen

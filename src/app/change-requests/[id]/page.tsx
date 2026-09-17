@@ -63,19 +63,8 @@ import { formatDateTimeZurich } from "@/lib/date-time";
 import { canDeleteChangeRequest } from "@/modules/change-requests/authorization";
 import { withBasePath } from "@/lib/app-paths";
 import { DeleteChangeRequestAction } from "@/components/delete-change-request-action";
-
-const tabs = [
-  "Übersicht",
-  "Freigaben",
-  "Technische Prüfung",
-  "AVOR",
-  "Einkauf",
-  "Aufgaben",
-  "Abschlussprüfung",
-  "Anhänge",
-  "Kommentare",
-  "Historie",
-];
+import { RequestWorkflowNavigation } from "@/components/request-workflow-navigation";
+import { deriveWorkflowStages } from "@/modules/workflow/navigation";
 const formatDate = formatDateTimeZurich;
 type ApprovalView = {
   id: string;
@@ -153,20 +142,27 @@ export default async function RequestDetailPage({
     .filter((a) => a.status === "REJECTED")
     .map((a) => a.comment)
     .filter((c): c is string => Boolean(c));
+  const workflowStages = deriveWorkflowStages({
+    status: request.status as ChangeRequestStatusKey,
+    approvals: current,
+    technicalReview: request.technicalReview,
+    avorReview: request.avorImpactReview,
+    purchasingReview: request.purchasingReview,
+  });
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4 sm:mb-6">
-        <div>
-          <div className="flex items-center gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="font-mono text-sm font-semibold text-[#175f91]">
               {request.number}
             </p>
             <StatusBadge status={request.status as ChangeRequestStatusKey} />
           </div>
-          <h1 className="mt-2 text-xl font-bold sm:text-2xl">
+          <h1 className="mt-2 break-words text-xl font-bold sm:text-2xl">
             {request.title || "Unbenannter Entwurf"}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 break-words text-sm text-slate-500">
             {request.machineTypes.map(({ machineType }) => machineType.code).join(", ") || "Kein Maschinentyp"} ·{" "}
             Antragsteller: {request.applicantName || "–"} · Aktualisiert{" "}
             {formatDate(request.updatedAt)}
@@ -194,19 +190,7 @@ export default async function RequestDetailPage({
           </div>
         )}
       </div>
-      <div className="-mx-4 mb-5 overflow-x-auto border-b border-slate-200 px-4 sm:mx-0 sm:px-0">
-        <nav className="flex min-w-max gap-5">
-          {tabs.map((t) => (
-            <Link
-              key={t}
-              href={`?tab=${encodeURIComponent(t)}`}
-              className={`border-b-2 px-1 pb-3 text-sm font-medium ${tab === t ? "border-[#175f91] text-[#175f91]" : "border-transparent text-slate-500"}`}
-            >
-              {t}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <RequestWorkflowNavigation activeTab={tab} stages={workflowStages} />
       {tab === "Übersicht" ? (
         <>
           <Overview
