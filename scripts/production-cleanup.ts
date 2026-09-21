@@ -1,10 +1,16 @@
 import { formatProductionCleanup, productionCleanup, ProductionCleanupStorageError } from "../src/modules/maintenance/production-cleanup";
 import { db } from "../src/server/db/client";
 
+export const PRODUCTION_CLEANUP_USAGE = "Usage: npm run production:cleanup -- [--dry-run|--execute|--help]";
+
 export async function main(args = process.argv.slice(2), environment = process.env) {
+  if (args.length === 1 && args[0] === "--help") {
+    console.log(PRODUCTION_CLEANUP_USAGE);
+    return;
+  }
   const validDryRun = args.length === 0 || (args.length === 1 && args[0] === "--dry-run");
   const execute = args.length === 1 && args[0] === "--execute";
-  if (!validDryRun && !execute) throw new Error("Allowed arguments: --dry-run or --execute.");
+  if (!validDryRun && !execute) throw new Error(PRODUCTION_CLEANUP_USAGE);
   const result = await productionCleanup(db, { execute, confirmation: environment.PRODUCTION_CLEANUP_CONFIRM });
   console.log(formatProductionCleanup(result));
 }

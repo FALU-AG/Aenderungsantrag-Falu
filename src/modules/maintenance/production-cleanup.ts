@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { StorageProvider } from "@prisma/client";
 import { db } from "@/server/db/client";
-import { removeStoredAttachment } from "@/server/storage/attachment-storage";
+import { removeStoredAttachmentNode } from "@/server/storage/attachment-storage-node";
 
 export const PRODUCTION_CLEANUP_CONFIRMATION = "DELETE_ALL_CHANGE_REQUESTS";
 
@@ -105,7 +105,7 @@ async function loadPreserved(client: CleanupDatabase, year: number): Promise<{ u
   return { users, counts: { users: users.length, roles, userRoles, sessions, passwordResetTokens, delegations, machineTypes, changeReasons, appSettings, unrelatedAuditEvents, unrelatedNotifications, otherYearCounters } };
 }
 
-export async function productionCleanup(client: CleanupDatabase, options: { execute?: boolean; confirmation?: string; now?: Date } = {}, removeStorage: StorageRemoval = removeStoredAttachment): Promise<ProductionCleanupResult> {
+export async function productionCleanup(client: CleanupDatabase, options: { execute?: boolean; confirmation?: string; now?: Date } = {}, removeStorage: StorageRemoval = removeStoredAttachmentNode): Promise<ProductionCleanupResult> {
   const execute = options.execute ?? false;
   validateProductionCleanupExecution(execute, options.confirmation);
   const year = productionCleanupYear(options.now);
