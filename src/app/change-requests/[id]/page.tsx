@@ -1,3 +1,4 @@
+import { centralUsers } from "@/modules/auth/directory";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -115,11 +116,7 @@ export default async function RequestDetailPage({
     },
   });
   if (!request) notFound();
-  const activeUsers = await db.user.findMany({
-    where: { active: true },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  const activeUsers = await centralUsers();
   const editable = canEditDraft(user, request);
   const deletable = canDeleteChangeRequest(user, request.approvals);
   const current = request.approvals.filter(

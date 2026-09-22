@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUser:(id:string)=>mocks.findUser({where:{id}})}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ currentUser: vi.fn(), transaction: vi.fn(), findUser: vi.fn(), findUserOrThrow: vi.fn(), findOverlap: vi.fn(), findDelegation: vi.fn(), notify: vi.fn(), revalidate: vi.fn() }));

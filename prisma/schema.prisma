@@ -500,3 +500,10 @@ model AppSetting {
   description String?
   updatedAt   DateTime @updatedAt
 }
+
+// Request replay ledger, no local authentication state.
+model AppAssertionUse {
+ id String @id
+ expiresAt DateTime
+ @@index([expiresAt])
+}

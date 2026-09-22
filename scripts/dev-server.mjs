@@ -6,7 +6,7 @@ export const DEV_URL = "http://localhost:3000/aenderungsantrag";
 
 export async function isApplicationReady(fetchImpl = fetch) {
   try {
-    const response = await fetchImpl(DEV_URL, {
+    const response = await fetchImpl(DEV_URL + "/api/health", {
       signal: AbortSignal.timeout(2_000),
     });
     return response.ok;

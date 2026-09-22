@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUsers:vi.fn().mockResolvedValue([{id:"sub",roles:[{role:{key:"EMPLOYEE"}}]},{id:"owner",roles:[{role:{key:"AVOR"}}]}])}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ findFirst: vi.fn() }));
 vi.mock("@/server/db/client", () => ({ db: { approvalDelegation: { findFirst: mocks.findFirst } } }));
@@ -11,5 +12,5 @@ describe("delegated approval authorization", () => {
     expect(await resolveApprovalAuthority({ id: "sub", roles: ["EMPLOYEE"] }, "AVOR")).toMatchObject({ allowed: true, delegation: { id: "d1", delegatingUserId: "owner" } });
     expect(await resolveApprovalAuthority({ id: "sub", roles: ["EMPLOYEE"] }, "TECHNICAL")).toEqual({ allowed: false, delegation: null });
   });
-  it("rejects unrelated users or delegations outside the active query", async () => { mocks.findFirst.mockResolvedValue(null); expect((await resolveApprovalAuthority({ id: "other", roles: ["EMPLOYEE"] }, "AVOR")).allowed).toBe(false); expect(mocks.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ enabled: true, startsAt: expect.anything(), endsAt: expect.anything() }) })); });
+  it("rejects unrelated users or delegations outside the active query", async () => { mocks.findFirst.mockResolvedValue(null); expect((await resolveApprovalAuthority({ id: "other", roles: ["EMPLOYEE"] }, "AVOR")).allowed).toBe(false); expect(mocks.findFirst).not.toHaveBeenCalled(); });
 });

@@ -1,13 +1,11 @@
+import { centralUsers } from "@/modules/auth/directory";
 import { db } from "@/server/db/client";
 import type { DelegationScopeKey } from "./domain";
 
 export async function loadDelegationPageData(userId: string, admin = false) {
   const [users, owners, delegations] = await Promise.all([
-    db.user.findMany({ where: { active: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: { id: true, name: true } }),
-    db.user.findMany({
-      where: { active: true, roles: { some: { role: { key: { in: ["AVOR", "TECHNICAL"] } } } } },
-      select: { id: true, name: true, roles: { select: { role: { select: { key: true } } } } },
-    }),
+    centralUsers(),
+    centralUsers().then((users)=>users.filter((user)=>user.roles.some(({role})=>["AVOR","TECHNICAL"].includes(role.key)))),
     db.approvalDelegation.findMany({ where: admin ? {} : { delegatingUserId: userId }, orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }], include: { delegatingUser: { select: { id: true, name: true } }, substituteUser: { select: { id: true, name: true } } } }),
   ]);
   return {

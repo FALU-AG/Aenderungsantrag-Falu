@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUsers:vi.fn().mockResolvedValue([{id:"sub",roles:[{role:{key:"EMPLOYEE"}}]},{id:"owner",roles:[{role:{key:"AVOR"}}]}])}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn(), transaction: vi.fn(), revalidatePath: vi.fn(), findDelegation: vi.fn() }));

@@ -1,3 +1,4 @@
+import { centralUsers } from "@/modules/auth/directory";
 import Link from "next/link";
 import Form from "next/form";
 import { db } from "@/server/db/client";
@@ -40,7 +41,7 @@ export default async function RequestsPage({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
     }),
-    db.user.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    centralUsers(),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (

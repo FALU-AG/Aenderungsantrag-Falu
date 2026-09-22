@@ -1,3 +1,4 @@
+import { centralUser } from "@/modules/auth/directory";
 import { db } from "@/server/db/client";
 import { MAX_DELIVERY_ATTEMPTS, safeDeliveryError, type NotificationTemplateData } from "./domain";
 import { createNotificationDeliveryProvider, type NotificationDeliveryProvider } from "./delivery-core";
@@ -5,10 +6,13 @@ import { createNotificationDeliveryProvider, type NotificationDeliveryProvider }
 export async function sendNotification(id: string, options: { provider?: NotificationDeliveryProvider; sensitiveData?: NotificationTemplateData } = {}) {
   const notification = await db.emailNotification.findUnique({ where: { id } });
   if (!notification || !["PENDING", "FAILED"].includes(notification.status) || notification.attemptCount >= MAX_DELIVERY_ATTEMPTS) return false;
+  if (["PASSWORD_RESET", "USER_INVITATION"].includes(notification.type)) return false;
+  const recipient = notification.recipientUserId ? await centralUser(notification.recipientUserId) : null;
+  if (!recipient) return false;
   const data = { ...((notification.templateData ?? {}) as NotificationTemplateData), ...(options.sensitiveData ?? {}) };
   if (notification.type === "PASSWORD_RESET" && !data.url) return false;
   try {
-    const result = await (options.provider ?? createNotificationDeliveryProvider()).send({ type: notification.type, recipientEmail: notification.recipientEmail, recipientName: notification.recipientName, subject: notification.subject, data, idempotencyKey: notification.idempotencyKey });
+    const result = await (options.provider ?? createNotificationDeliveryProvider()).send({ type: notification.type, recipientEmail: recipient.email, recipientName: recipient.name, subject: notification.subject, data, idempotencyKey: notification.idempotencyKey });
     await db.emailNotification.update({ where: { id }, data: { status: "SENT", providerMessageId: result.id === "disabled" ? null : result.id, sentAt: new Date(), failedAt: null, lastError: null, attemptCount: { increment: 1 } } });
     return true;
   } catch (error) {

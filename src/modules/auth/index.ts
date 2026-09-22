@@ -1,10 +1,11 @@
+import { portalLogin } from "./portal-config";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "./session";
 import { hasEffectiveRole } from "@/modules/authorization/roles";
 
 export async function getCurrentUser() {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(portalLogin());
   return user;
 }
 

@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUsers:vi.fn().mockResolvedValue([{id:"owner",roles:[{role:{key:"AVOR"}}]}])}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ taskFindMany: vi.fn(), requestFindMany: vi.fn(), delegationFindMany: vi.fn(), build: vi.fn() }));
@@ -16,7 +17,7 @@ describe("loadPersonalInbox", () => {
   });
 
   it("loads workflow requests for an active approval substitute", async () => {
-    mocks.delegationFindMany.mockResolvedValue([{ scope: "AVOR_APPROVAL", delegatingUser: { name: "Florian", roles: [{ role: { key: "AVOR" } }] } }]);
+    mocks.delegationFindMany.mockResolvedValue([{ scope: "AVOR_APPROVAL", delegatingUser: { id:"owner", name: "Florian", roles: [{ role: { key: "AVOR" } }] } }]);
     await loadPersonalInbox({ id: "sub", roles: ["EMPLOYEE"] });
     expect(mocks.requestFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { OR: [{ status: { not: "CLOSED" } }, { applicantId: "sub", status: "CHANGES_REQUESTED" }] } }));
     expect(mocks.build).toHaveBeenCalledWith(expect.objectContaining({ delegatedApprovals: [{ type: "AVOR", delegatingUserName: "Florian" }] }));

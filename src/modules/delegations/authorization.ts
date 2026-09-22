@@ -1,3 +1,4 @@
+import { centralUsers } from "@/modules/auth/directory";
 import type { AuthUser } from "@/modules/auth";
 import type { ApprovalTypeKey } from "@/modules/approvals/domain";
 import { db } from "@/server/db/client";
@@ -8,11 +9,14 @@ export type DelegatedAuthority = { id: string; delegatingUserId: string; delegat
 export async function findActiveDelegatedAuthority(user: Pick<AuthUser, "id" | "roles">, type: ApprovalTypeKey, now = new Date()): Promise<DelegatedAuthority | null> {
   const requiredRole = type === "AVOR" ? "AVOR" : "TECHNICAL";
   if (user.roles.includes("ADMINISTRATOR") || user.roles.includes(requiredRole)) return null;
+  const users = await centralUsers();
+  if (!users.some((u)=>u.id===user.id)) return null;
+  const owners = users.filter((u)=>u.roles.some(({role})=>role.key===requiredRole)).map((u)=>u.id);
   return db.approvalDelegation.findFirst({
     where: {
       substituteUserId: user.id, scope: scopeForApproval(type), enabled: true,
       startsAt: { lte: now }, endsAt: { gte: now },
-      substituteUser: { active: true }, delegatingUser: { active: true, roles: { some: { role: { key: requiredRole } } } },
+      delegatingUserId: { in: owners },
     },
     orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
     select: { id: true, delegatingUserId: true, delegatingUser: { select: { name: true } } },

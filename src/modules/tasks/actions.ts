@@ -1,4 +1,5 @@
 "use server";
+import { centralUser } from "@/modules/auth/directory";
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
@@ -54,10 +55,7 @@ export async function createTask(
     };
   const parsed = taskSchema.safeParse(input(f));
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors };
-  const responsible = await db.user.findFirst({
-    where: { id: parsed.data.responsibleUserId, active: true },
-    select: { id: true, name: true },
-  });
+  const responsible = await centralUser(parsed.data.responsibleUserId);
   if (!responsible)
     return {
       message:
@@ -127,10 +125,7 @@ export async function updateTask(
       throw new Error("Sie dürfen Aufgaben nicht anderen Personen zuweisen.");
     if (!access.canComplete && parsed.data.status === "DONE")
       throw new Error("Sie dürfen diese Aufgabe nicht abschliessen.");
-    const responsible = await tx.user.findFirst({
-      where: { id: parsed.data.responsibleUserId, active: true },
-      select: { id: true, name: true },
-    });
+    const responsible = await centralUser(parsed.data.responsibleUserId);
     if (!responsible)
       throw new Error(
         "Die verantwortliche Person ist nicht aktiv oder existiert nicht.",

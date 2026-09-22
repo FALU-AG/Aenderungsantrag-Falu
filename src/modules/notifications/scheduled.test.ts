@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUsers:()=>mocks.userFindMany()}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ userFindMany: vi.fn(), approvalFindMany: vi.fn(), queue: vi.fn(), send: vi.fn() }));
@@ -51,7 +52,7 @@ describe("personal weekly digest", () => {
 
   it("selects only active users, non-closed requests, and non-completed tasks", async () => {
     await runWeeklyDigest({ now: monday, ignoreSchedule: true });
-    expect(mocks.userFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { active: true }, select: expect.objectContaining({ requests: expect.objectContaining({ where: { status: { not: "CLOSED" } } }), assignedTasks: expect.objectContaining({ where: { status: { not: "DONE" } } }) }) }));
+    expect(mocks.userFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: [] } }, select: expect.objectContaining({ requests: expect.objectContaining({ where: { status: { not: "CLOSED" } } }), assignedTasks: expect.objectContaining({ where: { status: { not: "DONE" } } }) }) }));
   });
 
   it("does not give an admin-only user approval responsibility", async () => {

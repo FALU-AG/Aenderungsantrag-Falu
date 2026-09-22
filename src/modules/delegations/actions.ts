@@ -1,4 +1,5 @@
 "use server";
+import { centralUser } from "@/modules/auth/directory";
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/modules/auth";
@@ -26,8 +27,8 @@ function assertScopeManagement(actor: Awaited<ReturnType<typeof getCurrentUser>>
 
 async function validateUsersAndOverlap(input: ReturnType<typeof values>, excludeId?: string) {
   const [owner, substitute, overlap] = await Promise.all([
-    db.user.findUnique({ where: { id: input.delegatingUserId }, select: { active: true, roles: { select: { role: { select: { key: true } } } } } }),
-    db.user.findUnique({ where: { id: input.substituteUserId }, select: { active: true } }),
+    centralUser(input.delegatingUserId),
+    centralUser(input.substituteUserId),
     db.approvalDelegation.findFirst({ where: { id: excludeId ? { not: excludeId } : undefined, delegatingUserId: input.delegatingUserId, scope: input.scope, enabled: true, startsAt: { lt: input.endsAt }, endsAt: { gt: input.startsAt } }, select: { id: true } }),
   ]);
   if (!owner?.active || !owner.roles.some(({ role }) => role.key === roleForScope(input.scope))) throw new Error("Die delegierende Person besitzt die erforderliche Rolle nicht.");

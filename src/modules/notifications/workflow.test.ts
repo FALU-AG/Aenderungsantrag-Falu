@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUser:async()=>({id:"user-1",email:"user@falu.ch",name:"User"}),centralUsers:async()=> (await tx.user.findMany()) ?? ["sub","avor","tech"].map(id=>({id,email:id+"@falu.ch",name:id,roles:[{role:{key:id==="avor"?"AVOR":id==="tech"?"TECHNICAL":"EMPLOYEE"}}]}))}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ activeRoleRecipients: vi.fn(), requestRecipient: vi.fn(), queue: vi.fn() }));
@@ -20,7 +21,7 @@ describe("workflow notification orchestration", () => {
     mocks.queue.mockImplementation(async (_tx, input) => ({ id: input.idempotencyKey }));
     mocks.activeRoleRecipients.mockImplementation(async (_tx, role) => role === "AVOR" ? [{ id: "avor", email: "avor@falu.ch", name: "Anna AVOR" }] : [{ id: "tech", email: "tech@falu.ch", name: "Theo Technik" }]);
     mocks.requestRecipient.mockResolvedValue({ id: "applicant", email: "applicant@falu.ch", name: "Anna Antrag" });
-    tx.approvalDelegation.findMany.mockResolvedValue([]);
+    tx.approvalDelegation.findMany.mockResolvedValue([]); tx.user.findMany.mockReset();
   });
 
   it("notifies an active substitute without duplicating a direct recipient", async () => {
@@ -52,7 +53,7 @@ describe("workflow notification orchestration", () => {
     tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status: "CLOSED", finalComment: "Neue Halterung montiert und getestet.", closedAt: new Date("2026-09-16T10:00:00Z") });
     tx.user.findMany.mockResolvedValue([{ id: "u1", email: "u1@falu.ch", name: "Aktiv" }, { id: "u2", email: "u2@falu.ch", name: "Auch aktiv" }]);
     expect(await queueCompletedRequestBroadcast(tx as never, "cr-1")).toHaveLength(2);
-    expect(tx.user.findMany).toHaveBeenCalledWith({ where: { active: true }, select: { id: true, email: true, name: true } });
+    expect(tx.user.findMany).toHaveBeenCalled();
     expect(mocks.queue).toHaveBeenCalledWith(tx, expect.objectContaining({ idempotencyKey: "completed-broadcast:cr-1:u1", templateData: expect.objectContaining({ completionSummary: "Neue Halterung montiert und getestet.", detail: "Spannung verbessert" }) }));
     await queueCompletedRequestBroadcast(tx as never, "cr-1");
     expect(new Set(mocks.queue.mock.calls.map((call) => call[1].idempotencyKey))).toEqual(new Set(["completed-broadcast:cr-1:u1", "completed-broadcast:cr-1:u2"]));

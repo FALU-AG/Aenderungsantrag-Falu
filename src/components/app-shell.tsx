@@ -5,7 +5,7 @@ import type { AuthUser } from "@/modules/auth";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { CreateChangeRequestCta } from "./create-change-request-cta";
 import { LiveDateTime } from "./live-date-time";
-import { logout } from "@/modules/auth/actions";
+import { portalOrigin } from "@/modules/auth/portal-config";
 import { roleSummary } from "@/modules/users/domain";
 import { loadPersonalInbox } from "@/modules/inbox/query";
 import { MobileNavigation, type NavigationItem } from "./mobile-navigation";
@@ -36,7 +36,7 @@ export async function AppShell({
   const items: NavigationItem[] = [
     ...navigation.map((item) => ({...item, count: item.href === "/meine-aufgaben" ? inboxCount : undefined})),
     ...(canManageOwnDelegations(user.roles) ? [{ href: "/delegations", label: "Stellvertretung", icon: "delegations" as const }] : []),
-    ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/users", label: "Administration", icon: "administration" as const }] : []),
+    ...(user.roles.includes("ADMINISTRATOR") ? [{ href: "/admin/delegations", label: "Stellvertretungen verwalten", icon: "administration" as const }] : []),
   ];
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-50">
@@ -61,7 +61,7 @@ export async function AppShell({
           </Link>
           <div className="flex items-center gap-2 md:hidden">
             <MobileNavigation items={items} />
-            <form action={logout}><button aria-label="Abmelden" className="grid size-11 place-items-center rounded-md border border-slate-300 text-slate-700"><LogOut className="size-4" aria-hidden="true"/></button></form>
+            <a href={portalOrigin() + "/logout"} aria-label="Abmelden" className="grid size-11 place-items-center rounded-md border border-slate-300 text-slate-700"><LogOut className="size-4" aria-hidden="true"/></a>
           </div>
           <div className="order-3 flex w-full items-center justify-end gap-2 md:order-none md:w-auto md:gap-3">
             <LiveDateTime />
@@ -71,7 +71,7 @@ export async function AppShell({
               />
             </Suspense>
             <div className="hidden text-right lg:block"><p className="text-sm font-semibold text-slate-900">{user.name}</p><p className="text-xs text-slate-500">{roleSummary(user.roles)}</p></div>
-            <form action={logout} className="hidden md:block"><button className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#175f91] focus:ring-offset-2">Abmelden</button></form>
+            <a href={portalOrigin() + "/logout"} className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#175f91] focus:ring-offset-2">Abmelden</a>
           </div>
         </div>
       </header>

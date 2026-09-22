@@ -1,3 +1,4 @@
+vi.mock("@/modules/auth/directory",()=>({centralUsers:vi.fn().mockResolvedValue([{id:"avor",roles:[{role:{key:"AVOR"}}]},{id:"admin",roles:[{role:{key:"ADMINISTRATOR"}}]}])}));
 import { describe, expect, it, vi } from "vitest";
 import { activeRoleRecipients, explicitApprovalNotificationRoles } from "./recipients";
 
@@ -12,10 +13,7 @@ describe("Empfänger neuer Freigaberunden", () => {
 
   it("fragt aktive Empfänger ohne Administrator-Vererbung und ohne Duplikate ab", async () => {
     const findMany = vi.fn().mockResolvedValue([]);
-    await activeRoleRecipients({ user: { findMany } } as never, "AVOR");
-    expect(findMany).toHaveBeenCalledWith({
-      where: { active: true, roles: { some: { role: { key: "AVOR" } } } },
-      select: { id: true, email: true, name: true }, distinct: ["id"],
-    });
+    expect(await activeRoleRecipients({ user: { findMany } } as never, "AVOR")).toEqual([{id:"avor",roles:[{role:{key:"AVOR"}}]}]);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   // Playwright uses 127.0.0.1 while local development normally uses localhost.
   allowedDevOrigins: ["127.0.0.1"],
   experimental: {
+    proxyClientMaxBodySize: "21mb",
     // The application validates each attachment at 20 MB. Allow the multipart
     // envelope a small amount of additional headroom before app validation.
     serverActions: {
