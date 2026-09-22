@@ -116,7 +116,9 @@ export default async function RequestDetailPage({
     },
   });
   if (!request) notFound();
-  const activeUsers = await centralUsers();
+  // Reduced before it reaches the client component: the directory entry also carries the
+  // email address and the central user id, and neither belongs in the page payload.
+  const activeUsers = (await centralUsers()).map(({ id, name }) => ({ id, name }));
   const editable = canEditDraft(user, request);
   const deletable = canDeleteChangeRequest(user, request.approvals);
   const current = request.approvals.filter(

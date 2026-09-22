@@ -63,6 +63,10 @@ export function resetCentralDirectoryCache() { cached = undefined; inFlight = un
 export async function centralUsers(client: Prisma.TransactionClient = db) {
   const directory = await centralDirectory();
   const local = await client.user.findMany({ where: { externalId: { in: directory.map((u)=>u.id) } }, select: { id: true, externalId: true } });
-  return local.flatMap((row) => { const user = directory.find((u)=>u.id===row.externalId); return user ? [{ ...user, centralId: user.id, id: row.id, active: true as const, roles: user.roles.map((key)=>({role:{key}})) }] : []; });
+  // Sorted by the name that is actually displayed, so every selection list built on this
+  // is alphabetical without each caller having to remember to sort.
+  return local
+    .flatMap((row) => { const user = directory.find((u)=>u.id===row.externalId); return user ? [{ ...user, centralId: user.id, id: row.id, active: true as const, roles: user.roles.map((key)=>({role:{key}})) }] : []; })
+    .sort((a, b) => a.name.localeCompare(b.name, "de-CH"));
 }
 export async function centralUser(id: string, client: Prisma.TransactionClient = db) { return (await centralUsers(client)).find((u)=>u.id===id) ?? null; }

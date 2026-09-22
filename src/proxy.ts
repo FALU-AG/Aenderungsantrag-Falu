@@ -3,9 +3,18 @@ import { authenticatePortalRequest, DomainError } from "@/modules/auth/portal-gu
 import { portalOrigin, portalLogin } from "@/modules/auth/portal-config";
 import { db } from "@/server/db/client";
 import { withoutBasePath } from "@/lib/app-paths";
+/** Fail-closed page. The portal link is omitted when its origin is not configured. */
+function denied(status: number, portal: string | null) {
+  const link = portal ? '<a href="' + portal + '">Zum FALU Admin Portal</a>' : "";
+  return new NextResponse('<!doctype html><html lang="de"><title>Kein Zugriff</title><main><h1>Kein Zugriff</h1><p>Du hast aktuell keinen Zugriff auf Änderungsanträge. Wende dich bei Bedarf an einen Administrator.</p>' + link + '</main></html>', { status, headers: { "Content-Type":"text/html; charset=utf-8", "Cache-Control":"no-store" } });
+}
 export async function proxy(request: NextRequest) {
   const pathname = withoutBasePath(new URL(request.url).pathname);
   if ((["GET","HEAD"].includes(request.method) && (pathname.startsWith("/_next/static/") || ["/icon.svg","/api/health"].includes(pathname))) || pathname === "/api/webhooks/resend") return NextResponse.next();
+  // Resolve the portal origin before anything can fail, so a misconfigured origin answers with
+  // this page instead of throwing while the error path itself tries to build the portal link.
+  try { portalOrigin(); }
+  catch { return denied(503, null); }
   if (["GET","HEAD"].includes(request.method) && ["/login","/forgot-password","/reset-password","/change-password"].includes(pathname)) return NextResponse.redirect(portalLogin());
   try {
     if (!process.env.FALU_APP_SIGNING_PUBLIC_KEY) throw new DomainError("unavailable",503);
@@ -18,7 +27,8 @@ export async function proxy(request: NextRequest) {
     const response = NextResponse.next({ request: { headers } }); response.headers.set("Cache-Control","no-store"); return response;
   } catch (error) {
     const status = error instanceof DomainError ? error.status : 503;
+    // Safe here: the origin was resolved successfully above, so neither call can throw.
     if (status === 401 && ["GET","HEAD"].includes(request.method)) return NextResponse.redirect(portalLogin());
-    return new NextResponse('<!doctype html><html lang="de"><title>Kein Zugriff</title><main><h1>Kein Zugriff</h1><p>Du hast aktuell keinen Zugriff auf Änderungsanträge. Wende dich bei Bedarf an einen Administrator.</p><a href="' + portalOrigin() + '">Zum FALU Admin Portal</a></main></html>', { status, headers: { "Content-Type":"text/html; charset=utf-8", "Cache-Control":"no-store" } });
+    return denied(status, portalOrigin());
   }
 }
