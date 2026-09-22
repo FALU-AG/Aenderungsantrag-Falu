@@ -87,6 +87,46 @@ kein Deployment.
 > weiterhin keinen Test, der Portal → Worker → Änderungsantrag durchgängig prüft
 > (Phase B7), und die sechs Playwright-Specs sind unverändert gebrochen.
 
+### 0.4 Verifizierte Deployment-Konfiguration (Railway, 22.09.2026)
+
+Lesend über die Railway-CLI und die öffentliche GraphQL-API abgefragt. Damit ist die in
+Abschnitt 6.4 als „nicht versioniert und nicht überprüfbar" markierte Lücke geschlossen —
+die Konfiguration bleibt unversioniert, ist jetzt aber erhoben.
+
+| Dienst | Builder | Build | Pre-Deploy | Start | Healthcheck | Cron |
+| --- | --- | --- | --- | --- | --- | --- |
+| Falu-Admin-Portal | RAILPACK | automatisch | **`npx prisma migrate deploy`** | automatisch | `/health` | – |
+| Aenderungsantrag-Falu | RAILPACK | automatisch | **`npx prisma migrate deploy`** | automatisch | **nicht gesetzt** | – |
+| Weekly Personal Digest | RAILPACK | automatisch | – | `npm run notifications:weekly-digest` | – | `0 6,7 * * 1` |
+
+**Bestätigt:** `prisma migrate deploy` läuft in beiden Diensten automatisch vor jedem
+Deployment. **Kein `db push`, kein automatisches Seeding.** Der Cron-Dienst entspricht
+exakt der Dokumentation. Alle drei starten mit `restartPolicyType: ON_FAILURE`.
+
+#### Abweichungen und Befunde
+
+| # | Befund | Schwere | Empfehlung |
+| --- | --- | --- | --- |
+| D1 | Im Änderungsantrag-Dienst existiert eine Umgebungsvariable, deren **Name** mit `sb_secret_` beginnt — das Format eines Supabase Secret API Key. Offenbar wurde beim Anlegen der Schlüssel ins Namensfeld gefügt. Variablennamen sind deutlich weniger geschützt als Werte: sie erscheinen in Oberflächen, Logs und jeder Umgebungsauflistung | **hoch** | Den betroffenen Supabase-Schlüssel **rotieren** und die überzählige Variable löschen. Der reguläre `SUPABASE_SERVICE_ROLE_KEY` existiert daneben bereits |
+| D2 | `BOOTSTRAP_ADMIN_EMAIL` und `BOOTSTRAP_ADMIN_PASSWORD` sind in der Produktion weiterhin gesetzt — für ein Bootstrap-Skript, das im Umbau gelöscht wurde | mittel | Beide entfernen. Ein Administrator-Passwort gehört nicht dauerhaft in die Umgebung |
+| D3 | `RESEND_WEBHOOK_SECRET` ist **nicht gesetzt**. `webhook.ts:6` wirft ohne Secret, die Route schlägt also sauber fehl (kein Sicherheitsproblem) — aber Zustellstatus von Resend (zugestellt, unzustellbar, Beschwerde) werden dadurch **nie** verarbeitet | mittel | Secret setzen oder den Webhook bewusst als ungenutzt dokumentieren. Unabhängig von diesem Projekt |
+| D4 | Der Änderungsantrag-Dienst hat **keinen Healthcheck-Pfad**. Ein fehlgeschlagenes Deployment würde nicht erkannt. `/aenderungsantrag/api/health` existiert und ist im Proxy öffentlich | mittel | Healthcheck eintragen — besonders wichtig für den Stichtag, weil es keinen Rückfallpfad gibt |
+| D5 | Der Cron-Dienst hat einen **deutlich kleineren Variablensatz** als der Web-Dienst (kein `RESEND_API_KEY`, kein `EMAIL_*`, kein `SUPABASE_*`, kein `SLACK_NOTIFICATION_MODE`). `README.md:186` behauptet, er übernehme „dieselben Umgebungsvariablen wie der Web-Service" — das stimmt nicht | mittel | Dokumentation korrigieren **und** vor dem Stichtag ergänzen: ohne `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` und `FALU_APP_SIGNING_PUBLIC_KEY` schlägt künftig **jeder** Wochenlauf fehl |
+| D6 | Portal fehlt `FALU_CHANGE_REQUEST_DIRECTORY_SECRET`; Änderungsantrag fehlen `FALU_APP_SIGNING_PUBLIC_KEY`, `FALU_PORTAL_ORIGIN`, `FALU_PORTAL_SERVICE_ORIGIN`, `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` | erwartet | Wird in Phase D3 gesetzt. Hier nur zur Vollständigkeit |
+
+Vorhandene Variablennamen (nur Namen, keine Werte gelesen):
+
+- **Portal:** `APP_BASE_URL`, `DATABASE_URL`, `DIRECT_URL`, `FALU_APP_SIGNING_PRIVATE_KEY`,
+  `FALU_EDGE_AUTH_SECRET`, `RESEND_API_KEY` (dazu die `RAILWAY_*`-Systemvariablen).
+- **Änderungsantrag:** `AI_PROVIDER`, `APP_BASE_URL`, `BOOTSTRAP_ADMIN_EMAIL`,
+  `BOOTSTRAP_ADMIN_PASSWORD`, `DATABASE_URL`, `EMAIL_FROM`, `EMAIL_MODE`,
+  `EMAIL_REDIRECT_TO`, `OPENAI_API_KEY`, `OPENAI_TEXT_MODEL`,
+  `OPENAI_TRANSCRIPTION_MODEL`, `RESEND_API_KEY`, `SLACK_BOT_TOKEN`,
+  `SLACK_NOTIFICATIONS_ENABLED`, `SLACK_NOTIFICATION_MODE`,
+  `SLACK_TEST_RECIPIENT_USER_ID`, `SPEECH_PROVIDER`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SUPABASE_URL` sowie die überzählige Variable aus D1.
+- **Cron:** `APP_BASE_URL`, `DATABASE_URL`, `SLACK_BOT_TOKEN`, `SLACK_NOTIFICATIONS_ENABLED`.
+
 ### 0.3 Zusätzlicher Umfang aus Entscheidung 2
 
 Heute gilt `effectiveRoles()` (`src/modules/authorization/roles.ts:10`):
@@ -915,6 +955,11 @@ Bewertung:
 `Procfile` oder `Dockerfile`.** (Die CR-App hat nur eine `docker-compose.yml` für die lokale
 Entwicklungsdatenbank.) Sämtliche Railway-Befehle sind ausschliesslich Dashboard-Konfiguration
 und damit **nicht versioniert und nicht reviewbar**.
+
+> **Nachtrag 22.09.2026:** Die tatsächliche Konfiguration wurde inzwischen lesend erhoben und
+> ist in **Abschnitt 0.4** dokumentiert. Die Dokumentation stimmt: `npx prisma migrate deploy`
+> läuft als Pre-Deploy-Befehl, kein `db push`, kein automatisches Seeding. Versioniert ist sie
+> weiterhin nicht — Phase D4 bleibt offen.
 
 Dokumentierte Sollwerte:
 
