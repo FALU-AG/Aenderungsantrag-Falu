@@ -58,6 +58,56 @@ eigene Header und einen exakten Origin verlangen.
 
 ## Hoch
 
+### H3 – OFFEN: Server-Aktionen liefern hinter der Testumgebung keine Antwort
+
+**Gefunden am 22.09.2026 beim Aufbau der Browser-Tests. Nicht behoben. Vor dem Stichtag zu klären.**
+
+**Symptom:** Ein abgeschicktes Formular — Aufgabe anlegen, Abschluss freigeben — kommt nie
+zurück. Der Browser wartet unbegrenzt.
+
+**Was nachweislich funktioniert.** Mit Messpunkten entlang des gesamten Pfades belegt:
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Anfrage erreicht die Anwendung | ✅ 1401 Bytes Rumpf |
+| Assertion geprüft, Request-Bindung, Body-Hash | ✅ |
+| Replay-Sperre (`AppAssertionUse`) | ✅ |
+| Lokale Benutzerzeile aufgelöst | ✅ |
+| `centralUser` / Verzeichnis | ✅ |
+| Datenbanktransaktion — **die Aufgabe wird tatsächlich angelegt** | ✅ |
+| Benachrichtigungen erzeugt und zugestellt | ✅ |
+| `revalidatePath` | ✅ |
+| Aktion gibt Erfolg zurück | ✅ |
+| **HTTP-Antwort** | ❌ **kommt nie** |
+
+Danach protokolliert weder Next die Anfrage (Next protokolliert erst bei Abschluss) noch
+stellt die Anwendung eine weitere Anfrage. Sie hört einfach auf.
+
+**Ausgeschlossen:** Body-Hash-Prüfung, Replay-Sperre, Verzeichnisabruf, die Transaktion,
+der Benachrichtigungsversand, doppelte Übertragungskodierung in beide Richtungen (beides
+korrigiert, ohne Wirkung auf dieses Symptom).
+
+**Ungeklärt und genau das ist der Punkt:** Ob das nur an der HTTP-Weiterleitung der
+Testumgebung im Entwicklungsmodus liegt, oder ob Server-Aktionen auch **in Produktion hinter
+Cloudflare** hängen. Der Unterschied ist erheblich:
+
+- Nur Testumgebung ⇒ Schönheitsfehler im Testaufbau.
+- Auch Produktion ⇒ **die Anwendung wäre nach dem Stichtag unbenutzbar.** Lesen ginge, aber
+  kein Antrag liesse sich einreichen, keine Freigabe erteilen, keine Aufgabe anlegen.
+
+**Warum es bisher niemandem auffiel:** Der Ende-zu-Ende-Test im Portal prüft ausschliesslich
+Seitenaufrufe. Die 484 Unit-Tests rufen die Aktionsfunktionen direkt auf und umgehen den
+HTTP-Weg vollständig. Diese Lücke schliesst erst ein echter Browser.
+
+**Vorgeschlagene Klärung (halber Tag):** Die Browser-Tests gegen einen **Produktionsbuild**
+statt `next dev` laufen lassen. Dafür braucht der Verzeichnisabruf einen HTTPS-Zugang — das
+Muster dafür existiert bereits im Portal-Test (`test-change-request-handoff.ts`). Läuft es
+dort durch, ist es ein Artefakt des Entwicklungsmodus. Hängt es auch dort, ist es ein echter
+Fehler und muss vor dem Stichtag behoben werden.
+
+Bis dahin sind `final-review.spec.ts` und `task-management.spec.ts` mit `test.fixme` und
+dieser Begründung geparkt — sie erscheinen im Bericht als übersprungen, nicht als bestanden.
+
 ### H1 – Netzwerkaufruf zum Portal innerhalb von Datenbanktransaktionen
 
 **Wo:**

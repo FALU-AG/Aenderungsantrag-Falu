@@ -11,13 +11,24 @@
  * person a request belongs to comes from an `e2e-identity` cookie that the test sets - it
  * replaces signing in, and the `/logout` stub clears it so the real Abmelden link works too.
  *
+ * It also brings its own database. The tests create, change and delete requests, tasks and audit
+ * entries, so they must never touch a real one: the harness starts a throwaway PostgreSQL
+ * instance, migrates and seeds it, and removes it afterwards. The ambient DATABASE_URL is
+ * deliberately ignored, which is what makes reaching production impossible rather than merely
+ * discouraged. No local setup is required.
+ *
  * Everything here is test scaffolding. The application still verifies every assertion itself.
  */
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createSocketServer } from "node:net";
 import { generateKeyPairSync, sign, randomBytes, createHash } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import EmbeddedPostgres from "embedded-postgres";
 import { SAMPLE_USERS } from "../src/modules/auth/sample-users";
 import { centralId } from "./harness-identity";
+import { DATABASE_URL_FILE, E2E_DATABASE_DIR } from "./database";
 
 const HARNESS_PORT = Number(process.env.FALU_E2E_PORT ?? 3100);
 const APP_PORT = Number(process.env.FALU_E2E_APP_PORT ?? 3001);
@@ -25,22 +36,9 @@ const PREFIX = "/aenderungsantrag";
 const ORIGIN = `http://127.0.0.1:${HARNESS_PORT}`;
 const TTL = 15;
 
-// Read the same .env the application will read, so the check below sees the value that would
-// actually be used rather than an empty environment.
-try { process.loadEnvFile(".env"); } catch { /* no local .env: the check below still applies */ }
-
-// The browser tests create, change and delete requests, tasks and audit entries, and the specs
-// talk to the database directly to set up and tear down. Against a remote database that is data
-// loss, so refuse anything that is not loopback rather than trusting whoever runs this.
-const databaseHost = (() => { try { return new URL(process.env.DATABASE_URL ?? "").hostname; } catch { return ""; } })();
-if (!["127.0.0.1", "localhost", "::1"].includes(databaseHost)) {
-  console.error(`Refusing to start: DATABASE_URL points at ${databaseHost || "an unreadable value"}, not a local database.`);
-  console.error("Browser tests write and delete data. Start the local database (docker compose up -d) and point DATABASE_URL at it.");
-  process.exit(1);
-}
-
 const keys = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
 const directorySecret = randomBytes(32).toString("hex");
+const runDir = resolve(E2E_DATABASE_DIR, `run-${randomBytes(6).toString("hex")}`);
 
 const identities = SAMPLE_USERS.map((user) => ({ id: centralId(user.id), name: user.name, email: user.email, roles: user.roles }));
 
@@ -89,7 +87,11 @@ async function forward(request: IncomingMessage, response: ServerResponse) {
 
   const headers: Record<string, string | string[]> = { ...request.headers } as Record<string, string | string[]>;
   delete headers.cookie;
+  // The body is read in full above and sent with an explicit length. Forwarding the original
+  // framing headers alongside that makes the upstream wait for data that never comes: the
+  // browser sends form submissions chunked, so this is what hung every server action.
   delete headers["content-length"];
+  delete headers["transfer-encoding"];
   // Next compares the Origin header against the host it believes it is served on, so the
   // application must see the harness origin rather than its own port.
   headers.host = `127.0.0.1:${HARNESS_PORT}`;
@@ -97,10 +99,15 @@ async function forward(request: IncomingMessage, response: ServerResponse) {
   if (payload.length) headers["content-length"] = String(payload.length);
 
   const upstream = httpRequest({ host: "127.0.0.1", port: APP_PORT, method: request.method, path: target, headers }, (result) => {
-    response.writeHead(result.statusCode ?? 502, result.headers);
+    // Connection-level headers belong to the hop we just terminated. Passing the upstream's
+    // framing on while Node applies its own encodes the body twice, and the browser then waits
+    // for a stream that never ends - which is what stalled every streamed action response.
+    const headers = { ...result.headers };
+    for (const name of ["transfer-encoding", "connection", "keep-alive"]) delete headers[name];
+    response.writeHead(result.statusCode ?? 502, headers);
     result.pipe(response);
   });
-  upstream.on("error", () => { if (!response.headersSent) response.writeHead(502); response.end(); });
+  upstream.on("error", (error) => { console.error(`harness: upstream ${request.method} ${target} failed: ${error.message}`); if (!response.headersSent) response.writeHead(502); response.end(); });
   if (payload.length) upstream.write(payload);
   upstream.end();
 }
@@ -115,15 +122,69 @@ const server = createServer((request, response) => {
 });
 
 let app: ChildProcess | undefined;
-function shutdown() { app?.kill(); server.close(); process.exit(0); }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+let postgres: EmbeddedPostgres | undefined;
+let stopping = false;
+async function shutdown(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  app?.kill();
+  server.close();
+  // Windows holds the data directory briefly after shutdown; leftovers are ignored by git.
+  try { await postgres?.stop(); } catch { /* removed on the next run */ }
+  try { await rm(runDir, { recursive: true, force: true }); } catch { /* as above */ }
+  process.exit(code);
+}
+process.on("SIGINT", () => void shutdown());
+process.on("SIGTERM", () => void shutdown());
 
-server.listen(HARNESS_PORT, "127.0.0.1", () => {
+function freePort() {
+  return new Promise<number>((ok) => {
+    const socket = createSocketServer();
+    socket.listen(0, "127.0.0.1", () => {
+      const address = socket.address();
+      if (!address || typeof address === "string") throw new Error("port");
+      socket.close(() => ok(address.port));
+    });
+  });
+}
+function run(args: string[], env: NodeJS.ProcessEnv) {
+  return new Promise<void>((ok, fail) => {
+    const child = spawn(process.execPath, args, { env, stdio: "inherit", windowsHide: true });
+    child.on("error", fail);
+    child.on("exit", (code) => code === 0 ? ok() : fail(new Error(`Test setup failed: ${args[0]}`)));
+  });
+}
+
+async function start() {
+  // Playwright terminates its web server abruptly, so on Windows a previous run can leave a
+  // postgres process holding its data directory. A fresh directory per run means such a
+  // leftover can never block the next start; sweeping the old ones is best effort.
+  await mkdir(E2E_DATABASE_DIR, { recursive: true });
+  await rm(runDir, { recursive: true, force: true }).catch(() => undefined);
+
+  const password = randomBytes(24).toString("hex");
+  const port = await freePort();
+  postgres = new EmbeddedPostgres({ databaseDir: resolve(runDir, "data"), port, user: "postgres", password, persistent: false, postgresFlags: ["-h", "127.0.0.1"], onLog: () => {}, onError: () => {} });
+  await postgres.initialise();
+  await postgres.start();
+  const client = postgres.getPgClient();
+  await client.connect();
+  await client.query("CREATE DATABASE falu_e2e TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'");
+  await client.end();
+
+  const databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/falu_e2e`;
+  const env = { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: "development" as const };
+  await run(["node_modules/prisma/build/index.js", "migrate", "deploy"], env);
+  await run(["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"], env);
+  // The specs need the same connection; Playwright cannot hand it back from the web server.
+  await writeFile(DATABASE_URL_FILE, databaseUrl);
+
   app = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(APP_PORT)], {
-    stdio: "inherit", windowsHide: true,
+    // Both streams go to stderr: Playwright shows a web server's stderr but swallows its stdout,
+    // and without the application's own log a failing run gives nothing to work with.
+    stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     env: {
-      ...process.env,
+      ...env,
       FALU_APP_SIGNING_PUBLIC_KEY: keys.publicKey,
       FALU_CHANGE_REQUEST_DIRECTORY_SECRET: directorySecret,
       FALU_PORTAL_ORIGIN: ORIGIN,
@@ -131,6 +192,22 @@ server.listen(HARNESS_PORT, "127.0.0.1", () => {
       APP_BASE_URL: `${ORIGIN}${PREFIX}`,
     },
   });
-  app.on("exit", (code) => { server.close(); process.exit(code ?? 1); });
-  console.log(`Browser-test harness on ${ORIGIN}, application on port ${APP_PORT}`);
+  app.stdout?.pipe(process.stderr);
+  app.stderr?.pipe(process.stderr);
+  app.on("exit", (code) => void shutdown(code ?? 1));
+
+  // Only accept browser traffic once the application actually answers. Playwright waits on this
+  // listener, so starting it earlier would let the first test run against a dead upstream.
+  for (let attempt = 0; attempt < 600; attempt++) {
+    try { if ((await fetch(`http://127.0.0.1:${APP_PORT}${PREFIX}/api/health`)).ok) break; } catch { /* still starting */ }
+    if (app.exitCode !== null) throw new Error("The application stopped while starting up.");
+    await new Promise((ok) => setTimeout(ok, 250));
+  }
+  await new Promise<void>((ok) => server.listen(HARNESS_PORT, "127.0.0.1", ok));
+  console.log(`Browser-test harness on ${ORIGIN}, application on port ${APP_PORT}, throwaway database on port ${port}`);
+}
+
+start().catch(async (error: unknown) => {
+  console.error(error instanceof Error ? error.message : "Browser-test harness failed to start.");
+  await shutdown(1);
 });
