@@ -1,5 +1,22 @@
 # Zielzustand Benutzer und Rollen
 
+> ## Aktualisiert am 22.09.2026 — der Zuordnungsschritt entfällt
+>
+> Die Prüfung der Produktionsdatenbank ergab: **null Änderungsanträge**, keine Freigaben,
+> Aufgaben, Kommentare oder Anhänge. An den fünf lokalen Konten hängt keine Historie.
+>
+> Daraufhin wurde entschieden, die lokalen Konten **zu entfernen statt zuzuordnen**, und die
+> lokale Zeile künftig **automatisch beim ersten Besuch** anzulegen — aus signierten
+> Portaldaten, nach erfolgreicher Prüfung der Assertion.
+>
+> **Damit entfallen ersatzlos:** die Zuordnungsdatei `mappings.json`, das Migrationsskript
+> `scripts/change-request-migration.ts` im Portal-Repo, die Vier-Augen-Prüfung der Zuordnung
+> und das gesamte Risiko einer Verwechslung (Kernfrage G der Phase-A-Analyse).
+>
+> **Neu stattdessen:** `npm run db:reset-local-users` in der Änderungsantrag-App entfernt
+> einmalig die Altbestände. Abschnitt 3 unten ist entsprechend angepasst; Abschnitt 1 und 2
+> bleiben als Bestandsaufnahme gültig.
+
 Stand 22.09.2026. Grundlage: lesende Abfrage beider Produktionsdatenbanken über die
 Railway-CLI. Es wurde nichts geschrieben. Ergänzung zu
 [PHASE_A_ANALYSE.md](PHASE_A_ANALYSE.md) und [PHASE_B_REVIEW.md](PHASE_B_REVIEW.md).
@@ -105,7 +122,7 @@ Portal-Migration ausgerollt ist — vorher existiert die Tabelle nicht.
 
 > Passwörter erzeuge und übermittle ich grundsätzlich nicht. Das bleibt vollständig bei dir.
 
-### Schritt 2 — nach dem Ausrollen der Portal-Migration (Phase C/E)
+### Schritt 2 — nach dem Ausrollen der Portal-Migration
 
 - [ ] Bei **Marc Wyss** den Zugriff auf `Änderungsanträge` aktivieren.
 - [ ] Bei allen fünf Konten die fachlichen Rollen gemäss Zielzustand setzen —
@@ -114,29 +131,36 @@ Portal-Migration ausgerollt ist — vorher existiert die Tabelle nicht.
       stellt das Portal keine Assertion aus, und die Person sieht „Kein Zugriff" statt
       einer Anmeldeaufforderung.
 
-### Schritt 3 — Zuordnungsliste für die Migration (Phase E)
+### Schritt 3 — Altbestände entfernen (im Wartungsfenster)
 
-Die eigentliche Verknüpfung erfolgt über `scripts/change-request-migration.ts` im
-Portal-Repo. Es braucht eine Datei `mappings.json` mit fünf Paaren aus lokaler und
-zentraler Benutzerkennung.
+Statt der früher geplanten Zuordnung wird einmalig aufgeräumt. Danach entsteht jede lokale
+Zeile automatisch beim ersten Besuch.
 
-Die Kennungen selbst stehen erst beim Probelauf fest; sie werden dort ausgegeben. Die
-inhaltliche Zuordnung ist bereits jetzt eindeutig, weil alle fünf E-Mail-Adressen auf
-beiden Seiten übereinstimmen:
+- [ ] **Datenbank-Backup erstellen und prüfen.**
+- [ ] Trockenlauf — schreibt nichts:
 
-| Änderungsantrag | Admin Portal |
-| --- | --- |
-| kaufmann@falu.com | kaufmann@falu.com |
-| wyss@falu.com | wyss@falu.com |
-| graber@falu.com | graber@falu.com *(Konto noch anzulegen)* |
-| toker@falu.com | toker@falu.com |
-| bodmer@falu.com | bodmer@falu.com *(Konto noch anzulegen)* |
+  ```powershell
+  railway run --service Aenderungsantrag-Falu -- npx tsx scripts/reset-local-users.ts --dry-run
+  ```
 
-> **Achtung:** Diese Übereinstimmung ist ein glücklicher Umstand, keine Regel. Das
-> Migrationsskript gleicht **bewusst nicht** über E-Mail ab — die Zuordnung ist und bleibt
-> manuell und muss im Vier-Augen-Prinzip geprüft werden. Bei einer Verwechslung erbt eine
-> Person die vollständige Historie einer anderen, inklusive ihrer erteilten Freigaben,
-> und das fällt nachträglich nicht mehr auf.
+- [ ] Ausgabe prüfen: fünf Benutzer, keine Änderungsanträge, keine Freigaben.
+- [ ] Ausführen:
+
+  ```powershell
+  $env:CONFIRM_LOCAL_USER_RESET = "DELETE_ALL_LOCAL_USERS"
+  railway run --service Aenderungsantrag-Falu -- npx tsx scripts/reset-local-users.ts --execute
+  Remove-Item Env:CONFIRM_LOCAL_USER_RESET
+  ```
+
+- [ ] Danach meldet sich jede Person einmal an. Die lokale Zeile entsteht dabei von selbst.
+
+Das Skript **verweigert die Ausführung**, sobald auch nur ein Änderungsantrag, eine Freigabe,
+eine Aufgabe, ein Kommentar oder ein Anhang existiert — dann hinge Historie an den Zeilen und
+das Entfernen wäre Datenverlust. Es ist ausschliesslich ein Werkzeug für den Zustand vor der
+produktiven Nutzung.
+
+Erhalten bleiben: Maschinentypen, Änderungsgründe, App-Einstellungen, der Nummernzähler und
+der Rollenkatalog.
 
 ---
 
@@ -144,6 +168,12 @@ beiden Seiten übereinstimmen:
 
 | Was | Wovon abhängig |
 | --- | --- |
-| Fachliche Rollen vergeben | Portal-Migration `20260921090000_application_roles` ausgerollt (Phase C6) |
-| Zuordnung ausführen | Alle fünf Portalkonten existieren, Zugriff aktiv, Rollen gesetzt, Passwortwechsel abgeschlossen |
-| Stichtag | Zuordnung geprüft, Ende-zu-Ende-Test aus Phase B8 erfolgreich |
+| Fachliche Rollen vergeben | Portal-Migration `20260921090000_application_roles` ausgerollt |
+| Altbestände entfernen | Backup vorhanden, Trockenlauf geprüft, noch keine produktiven Anträge |
+| Stichtag | Portalkonten vollständig, Rollen gesetzt, Ende-zu-Ende-Test erfolgreich |
+
+## 5. Was künftig bei einer Neueinstellung zu tun ist
+
+Nur noch ein Schritt: **im Portal ein Konto anlegen, Zugriff auf Änderungsanträge geben und
+mindestens eine fachliche Rolle vergeben.** In der Änderungsantrag-App ist nichts mehr zu
+tun — die lokale Zeile entsteht beim ersten Aufruf.

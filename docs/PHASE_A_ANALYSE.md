@@ -600,8 +600,11 @@ Annahmen des Codes:
 | `src/modules/maintenance/production-cleanup.ts:102,162` | lesen | Report „SSO mapping: present/absent" |
 | *Portal* `scripts/change-request-migration.ts:20,24,35-37` | lesen **und schreiben** | einziger Schreibpfad: `UPDATE "User" SET "externalId" = ...` |
 
-**Es gibt in der CR-App selbst keinen Code, der `externalId` schreibt.** Das ist bewusst so:
-Die Zuordnung erfolgt ausschliesslich über das geprüfte Migrationsskript im Portal-Repo.
+**Es gibt in der CR-App selbst keinen Code, der `externalId` schreibt.**
+
+> **Überholt seit 22.09.2026.** `src/modules/auth/provisioning.ts` schreibt `externalId` jetzt
+> selbst — beim ersten Besuch, aus signierten Portaldaten, nach geprüfter Assertion. Das
+> Migrationsskript im Portal-Repo wird nicht mehr benötigt.
 
 ### 3.8 Weekly Digest und Slack-Empfänger
 
@@ -1107,6 +1110,13 @@ Das ist die wichtigste Entscheidung, die Florian treffen muss (siehe Abschnitt 1
 
 ### E. Lokale User-Daten, die zwingend erhalten bleiben müssen
 
+> **Eingeschränkt gültig seit 22.09.2026.** Die Tabelle unten beschreibt, was erhalten
+> bleiben muss, **sobald Historie existiert** — und das bleibt der Dauerzustand. Zum
+> Zeitpunkt der Umstellung existiert sie jedoch nicht: null Änderungsanträge, null
+> Freigaben, null Aufgaben. Deshalb werden die fünf Altkonten einmalig entfernt und
+> danach automatisch neu angelegt. Das Schutzbedürfnis unten greift ab dem ersten
+> produktiven Antrag; das Aufräumskript verweigert ab da die Ausführung.
+
 | Feld/Tabelle | Warum |
 | --- | --- |
 | `User.id` | Ziel von 19 `Restrict`-Fremdschlüsseln (Abschnitt 5). Eine Änderung oder Löschung ist unmöglich, ohne die gesamte Historie zu zerstören |
@@ -1158,6 +1168,16 @@ wieder (siehe Kernfrage F).
 4. `docs/admin-portal-architecture.md:12` beschreibt das Cookie weiterhin als aktiven Mechanismus.
 
 ### G. Risiken bei der Migration der 5 lokalen Benutzer auf `externalId`
+
+> **Hinfällig seit 22.09.2026.** Die Prüfung der Produktionsdatenbank ergab null
+> Änderungsanträge und damit keine Historie an den lokalen Konten. Entschieden wurde,
+> die Konten zu **entfernen statt zuzuordnen** und die lokale Zeile künftig automatisch
+> beim ersten Besuch aus signierten Portaldaten anzulegen
+> (`src/modules/auth/provisioning.ts`). Damit entfallen die Zuordnungsdatei, das
+> Migrationsskript und sämtliche zwölf unten aufgeführten Risiken — es gibt nichts mehr
+> zuzuordnen und nichts zu verwechseln. Der Abschnitt bleibt als Begründung stehen,
+> warum dieser Weg gewählt wurde. Einzelheiten:
+> [ZIELZUSTAND_BENUTZER.md](ZIELZUSTAND_BENUTZER.md).
 
 Das Migrationsskript `scripts/change-request-migration.ts` (Portal-Repo) ist sorgfältig gebaut:
 Dry-Run als Default, SHA-256-Fingerprint über den Plan, Pflicht-Bestätigung
@@ -1317,10 +1337,11 @@ kurzlebigen Cache geben?
 Rollen entstehen heute nur per Migration mit festen IDs (`cr-role-*`). Für PMS/Shop braucht es
 eine Pflege-UI. Jetzt bauen oder später?
 
-**Entscheidung 9 – Zeitpunkt und Verfahren des ID-Mappings.**
-Wer erstellt `mappings.json`, wer reviewt es, und wie wird fachlich verifiziert, dass die fünf
-Zuordnungen korrekt sind? Ohne E-Mail-Matching ist das ein rein manueller Vorgang.
-Empfehlung: Vier-Augen-Prinzip und ein Audit-Eintrag nach dem Apply.
+**Entscheidung 9 – Zeitpunkt und Verfahren des ID-Mappings. → ✅ ENTFÄLLT.**
+Es gibt kein Mapping mehr. Da keine Historie an den lokalen Konten hängt, werden sie einmalig
+entfernt, und die lokale Zeile entsteht danach automatisch beim ersten Besuch aus signierten
+Portaldaten. `mappings.json`, die Vier-Augen-Prüfung und der Audit-Eintrag über das Mapping
+sind damit gegenstandslos.
 
 **Entscheidung 10 – Umgang mit den gebrochenen e2e-Tests.**
 Alle sechs Playwright-Specs hängen an `loginAs()`. Neu schreiben (Assertion-Stub oder
@@ -1401,18 +1422,20 @@ Jeder Schritt ist einzeln überprüfbar und – bis Phase E – einzeln rückneh
 | D5 | Uhren-/NTP-Prüfung beider Railway-Services (Entscheidung 12) | Drift < 1 s belegt |
 | D6 | Cron-Service um die neuen Variablen ergänzen | Manueller Lauf mit `--ignoreSchedule` erfolgreich |
 
-### Phase E – Datenmigration der 5 Benutzer
+### Phase E – Altbestände entfernen
+
+> **Neu gefasst am 22.09.2026.** Statt zuzuordnen wird einmalig aufgeräumt; die lokalen
+> Zeilen entstehen danach von selbst. `mappings.json`, `change-request-migration.ts`,
+> die Vier-Augen-Prüfung und die Rollback-Probe entfallen ersatzlos.
 
 | E# | Schritt | Prüfkriterium |
 | --- | --- | --- |
 | E1 | Verifizierte DB-Backups beider Datenbanken | Wiederherstellung getestet |
 | E2 | Die fünf Portal-Konten anlegen/prüfen, `CHANGE_REQUEST`-Zugriff + App-Rollen in der UI setzen, Passwortwechsel abschliessen lassen | `mustChangePassword=false` für alle fünf |
-| E3 | `mappings.json` im Vier-Augen-Prinzip erstellen (Entscheidung 9) | zwei Unterschriften |
-| E4 | `change-request-migration.ts plan` – Dry-Run, Konflikte = 0 | Plan + Fingerprint archiviert |
-| E5 | Wartungsfenster: `apply-portal`, dann `apply-local` | Skript meldet Erfolg; Drift-Prüfungen greifen |
-| E6 | Verifikation: alle fünf lokalen Zeilen haben die erwartete `externalId`; Verzeichnisabruf liefert genau fünf Benutzer mit korrekten Rollen | Read-only-Query + `centralUsers()`-Probe |
-| E7 | Audit-Eintrag über das Mapping (Entscheidung 9) | Eintrag vorhanden |
-| E8 | Rollback-Probe auf einer Kopie: `rollback-local`/`rollback-portal` | stellt Ausgangszustand her |
+| E3 | `npm run db:reset-local-users -- --dry-run` gegen die Produktion | Fünf Benutzer gelistet, null Anträge, null Freigaben |
+| E4 | Im Wartungsfenster mit `--execute` und Bestätigungsvariable ausführen | Skript meldet Erfolg; verweigert, sobald Geschäftsdaten existieren |
+| E5 | Jede Person meldet sich einmal an | Lokale Zeile entsteht automatisch, `externalId` gesetzt, Name und Adresse aus dem Portal |
+| E6 | Verifikation: Verzeichnisabruf liefert genau fünf Benutzer mit korrekten Rollen | Read-only-Query + `centralUsers()`-Probe |
 
 ### Phase F – Cutover und Nachbereitung
 
