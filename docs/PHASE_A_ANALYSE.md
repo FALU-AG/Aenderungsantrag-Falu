@@ -317,12 +317,14 @@ in `next.config.ts` (exakter Host, keine Wildcard).
 - Deaktivierung, Rollenwechsel oder E-Mail-Änderung löschen alle Sessions (`service.ts:325`).
 - Alle Sicherheitsmutationen laufen unter `pg_advisory_xact_lock(194701, 1)` (`service.ts:35-40`).
 
-> **Beobachteter Defekt (vorbestehend, committet):** `AuthService.bootstrap()` (`service.ts:355-364`)
-> parst `roles` aus dem Input, legt den Benutzer aber **ohne `UserRole`-Zeilen** an – es wird nur
-> `legacyRole: "ADMINISTRATOR"` gesetzt und `replaceRoles()` nie aufgerufen. Da jede Autorisierung
-> ausschliesslich `UserRole` liest (`administrator()`, `service.ts:48-52`), hätte ein über
-> `npm run admin:create` gebootstrappter Administrator **keine** `ADMIN`-Rolle. Nicht Teil dieses
-> Auftrags, aber vor dem nächsten Bootstrap zu prüfen.
+> **~~Beobachteter Defekt~~ – zurückgezogen am 22.09.2026, war ein Irrtum.**
+> Ursprüngliche Vermutung: `AuthService.bootstrap()` (`service.ts:355-364`) lege den Benutzer
+> ohne `UserRole`-Zeile an, weil es nur `legacyRole: "ADMINISTRATOR"` setzt und `replaceRoles()`
+> nie aufruft. **Das ist falsch.** Die Migration `20260917170000_multi_role_support` legt den
+> Trigger `User_sync_legacy_role` an, der bei `INSERT` oder einer Änderung von `role`
+> automatisch die passende `UserRole`-Zeile erzeugt (`ADMINISTRATOR`/`ADMIN` ⇒ `UserRole ADMIN`).
+> Ein über `npm run admin:create` gebootstrappter Administrator erhält seine Rolle also korrekt.
+> Der Code ist in Ordnung; hier fehlt lediglich ein Kommentar, der auf den Trigger verweist.
 
 ### 2.6 Anwendungszugriffe und App-Rollen
 
@@ -1360,8 +1362,8 @@ Jeder Schritt ist einzeln überprüfbar und – bis Phase E – einzeln rückneh
 | **B5** | **Zeilenweises Review des gesamten Arbeitsbaums beider Repos** – der Code war nie gebaut und ist daher fachlich unverifiziert | Jede geänderte/neue Datei bewusst gelesen und abgenommen |
 | B6 | `.env.example` in beiden Repos um die fehlenden Variablennamen ergänzen (Abschnitt 9, #13/#14) | Review |
 | B7 | Portal `tests/handoff.test.ts` um `routeChangeRequest` erweitern (Cookie-Isolation, 401→303, 403, Body-Limit, Static-Bypass) | neue Tests grün |
-| **B8** | **Ein `test:handoff`-Pendant für CHANGE_REQUEST bauen:** beide Server, zwei isolierte DBs, ephemere Schlüssel, echter Adapter | End-to-End-Lauf grün. **Pflicht** – bei Entscheidung 1 gibt es keinen Rückfallpfad, das ist die einzige Absicherung vor dem Stichtag |
-| B9 | Negativtests: abgelaufene Assertion, Replay, falsche Audience, manipulierter Body, fehlendes `externalId`, fehlende App-Rolle, `mustChangePassword` | alle fail closed |
+| **B8** | **Ein `test:handoff`-Pendant für CHANGE_REQUEST bauen** | ✅ **erledigt 22.09.2026.** `npm run test:handoff:change-request` im Portal-Repo. Startet beide Produktionsserver gegen zwei isolierte Wegwerf-Datenbanken, schaltet den echten Cloudflare-Adapter mit ephemeren Ed25519-Schlüsseln dazwischen und fährt die volle Kette durch. Lauf grün; mit absichtlich falschem Schlüssel schlägt er fehl, hat also Aussagekraft |
+| B9 | Negativtests: Replay, falsche Audience, manipulierter Body, fehlendes `externalId`, fehlende App-Rolle | ✅ **weitgehend erledigt** durch B8 und die fünf neuen Proxy-Tests. Offen: abgelaufene Assertion und `mustChangePassword` im Ende-zu-Ende-Lauf |
 | B10 | `docs/admin-portal-architecture.md` als überholt kennzeichnen oder ersetzen; READMEs korrigieren (Abschnitt 9, #1–#12) | Review |
 | B11 | Prüfen, ob `src/modules/users/domain.ts`, `auth/password.ts`, `auth/sample-users.ts`, `auth/public-routes.ts` noch gebraucht werden | entfernt oder begründet behalten |
 | B12 | Beide Arbeitsbäume in Feature-Branches committen (noch kein `main`) | `git status` sauber, Branches gepusht. **Erst nach B5** |
@@ -1370,7 +1372,7 @@ Jeder Schritt ist einzeln überprüfbar und – bis Phase E – einzeln rückneh
 
 | C# | Schritt | Prüfkriterium |
 | --- | --- | --- |
-| C1 | Bootstrap-Defekt beheben: `bootstrap()` muss `UserRole` schreiben (`service.ts:355`) | Test deckt „gebootstrappter Admin kann `/admin/users` öffnen" ab |
+| C1 | ~~Bootstrap-Defekt beheben~~ **entfällt** – war ein Irrtum, siehe Abschnitt 2.5. Der Datenbanktrigger `User_sync_legacy_role` erledigt das bereits. Stattdessen nur einen Kommentar im Code ergänzen, der auf den Trigger verweist | Kommentar vorhanden |
 | C2 | CRUD für `ApplicationRole` (Server Action + `CatalogForm`-Variante), analog zu Permissions | Rolle für eine Test-App anlegbar |
 | C3 | `saveApplicationPermission`-Sperre für `CHANGE_REQUEST` (`service.ts:116`) generisch machen oder bewusst dokumentieren | Entscheid dokumentiert |
 | C4 | Kachelfilterung auf `/` nach `UserApplicationAccess` (Entscheidung 11); `src/config/applications.ts` an die DB-Schlüssel koppeln | Benutzer ohne Zugriff sieht die Kachel nicht bzw. als gesperrt |

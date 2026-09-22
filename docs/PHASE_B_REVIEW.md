@@ -43,8 +43,16 @@ Freigegeben wurde die Behebung der fünf blockierenden Befunde. Ergebnis:
 | `build` | ✅ 16 Routen | ✅ 19 Routen |
 | `test` | ✅ 51/51 | ✅ **481/481** (vorher 473) |
 
-Nicht geprüft: die sechs Playwright-Suiten (unverändert gebrochen) und der durchgängige
-Ende-zu-Ende-Lauf Portal → Worker → Änderungsantrag (Phase B8, steht noch aus).
+**Nachtrag 22.09.2026 – der Ende-zu-Ende-Lauf existiert jetzt.** `npm run
+test:handoff:change-request` im Portal-Repo fährt die volle Kette Portal → Cloudflare-Adapter
+→ Änderungsantrag gegen zwei isolierte Wegwerf-Datenbanken durch und ist grün. Er deckt
+anonymen Zugriff, den direkten Origin, Zugriff ohne Rolle, Zugriff mit Rolle, den signierten
+Verzeichnisabruf, Replay, gefälschte Identitätsheader, fehlendes `externalId`-Mapping sowie
+Widerruf über Rollenentzug, Zugriffsentzug, Logout und Deaktivierung ab.
+
+Nicht geprüft: die sechs Playwright-Suiten (unverändert gebrochen) und Mutationen über
+Server Actions — der Ende-zu-Ende-Lauf beschränkt sich auf Seitenaufrufe, weil Next-Server-Actions
+eigene Header und einen exakten Origin verlangen.
 
 ---
 
@@ -220,6 +228,24 @@ Der Worker macht es richtig (`integration/cloudflare/change-request.mjs:49-51` s
 - `src/app/layout.tsx:28` – `user?.mustChangePassword` ist wegen `session.ts:14` immer `false`
 
 Entfernen oder mit einer Begründung behalten (Phase B11).
+
+### N4 – Eine Fehlkonfiguration des Portal-Origins endet in einem 500 statt einer Fehlerseite
+
+**Wo:** `src/proxy.ts:19-22`
+
+Der `catch`-Block ruft `portalLogin()` und `portalOrigin()` auf. Beide werfen, wenn
+`FALU_PORTAL_ORIGIN` ungültig ist – und dieser Wurf liegt **ausserhalb** des `try`. Der
+vorgesehene 503 mit der Seite „Kein Zugriff" wird dadurch nie erreicht; stattdessen
+antwortet Next mit einem nackten `500 Internal Server Error`.
+
+Empirisch bestätigt am 22.09.2026: Mit `FALU_PORTAL_ORIGIN=http://127.0.0.1:39999` und
+Produktionsmodus antwortet die Anwendung auf `/aenderungsantrag` mit `500`.
+
+Praktische Auswirkung ist gering – der Fall tritt nur bei falsch gesetzter Variable ein,
+und er scheitert immerhin geschlossen. Unschön ist, dass genau in dieser Lage die
+Fehlersuche erschwert wird: Der 500 nennt keine Ursache, die vorgesehene Meldung hätte es
+getan. **Empfehlung:** Den Origin einmal am Anfang auflösen und im `catch` nur noch den
+bereits ermittelten Wert verwenden, mit einer festen Rückfallseite ohne Origin.
 
 ### N3 – Optimierte Bilder lösen einen Portal-Abruf aus
 
