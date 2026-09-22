@@ -8,7 +8,7 @@ This runbook removes the pre-rollout Change Request test population. It does **n
 | --- | --- | --- |
 | Transactional test data | `ChangeRequest`, `ChangeRequestMachineType`, `ChangeRequestReason`, `Approval`, `FinalApproval`, `TechnicalReview`, `AvorImpactReview`, `PurchasingReview`, `Task`, `Attachment`, `Comment`, request-linked `AuditEvent`, request/task-linked `EmailNotification`, and the completion/closing text stored on `ChangeRequest` | Deleted for every Change Request shown by the reviewed dry run |
 | Master/configuration | `MachineType`, `ChangeReason`, `AppSetting` | Preserved |
-| User/role/auth | `User`, `Role`, `UserRole`, `Session`, `PasswordResetToken`, `ApprovalDelegation` | Preserved. `User.externalId` remains the central-portal/SSO mapping; local users remain required by application relations and history. |
+| User/role/auth | `User`, `Role`, `UserRole`, `Session`, `PasswordResetToken`, `ApprovalDelegation` | Preserved. `User.externalId` is the mapping onto the central portal identity, and local user rows remain required by application relations and history. `Role`, `UserRole`, `Session` and `PasswordResetToken` no longer carry any authentication meaning since the portal became the sole identity source; they are kept for history and are scheduled for a separate decision. |
 | Ambiguous/unowned | `AuditEvent` without a Change Request, `EmailNotification` without a Change Request or Task, unreferenced Storage objects, and `ChangeRequestCounter` rows for other years | Preserved and reported; never deleted automatically |
 
 The cleanup deliberately selects all Change Requests in the database. It is suitable only for the controlled pre-go-live database after the dry-run list has been confirmed as test data. Never execute it after real requests have entered the system.
@@ -110,9 +110,9 @@ Before admitting real production traffic:
 
 ### 9. Final readiness check
 
-- Application health, login/SSO, authorization, private attachments, OpenAI features, Slack/email delivery, and scheduled jobs are operational.
+- Application health, central sign-in through the portal, authorization, private attachments, OpenAI features, Slack/email delivery, and scheduled jobs are operational.
 - No Change Requests or request-owned Storage objects remain.
-- Users and application roles are intact.
+- Local user rows and their `externalId` mappings are intact, and the portal still grants each of them application access and at least one role.
 - Master/configuration data is intact.
 - Current-year numbering is ready at `1`.
 - Maintenance restrictions can be removed and company-wide use can begin.

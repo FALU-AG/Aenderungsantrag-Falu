@@ -1233,6 +1233,14 @@ Trotzdem bleiben konkrete Risiken:
 
 ## 9. Widersprüche zwischen Code und bisheriger Dokumentation
 
+> **Stand 22.09.2026: bereinigt.** Die Tabelle beschreibt den Zustand zum Zeitpunkt der
+> Analyse und bleibt als Nachweis unverändert stehen. Umgesetzt wurde:
+> `docs/admin-portal-architecture.md` liegt jetzt als
+> [docs/archiv/2026-09-17-entra-zielarchitektur-ueberholt.md](archiv/2026-09-17-entra-zielarchitektur-ueberholt.md)
+> mit einem Warnhinweis am Anfang; beide READMEs, beide `.env.example` und
+> `PRODUCTION-ROLLOUT.md` sind korrigiert. Die Pfadangaben unten zeigen daher auf den
+> alten Ort.
+
 | # | Dokument | Aussage | Tatsächlicher Code |
 | --- | --- | --- | --- |
 | 1 | `docs/admin-portal-architecture.md` (gesamt) | Zielarchitektur ist **Microsoft Entra ID** als alleinige Identitätsquelle, optional Cloudflare Access; `externalId` speichert den Entra-`oid` | Kein Entra, kein OIDC, kein Cloudflare Access, kein `jose`/JWKS. `externalId` speichert die **Portal-cuid**. Das Portal **ist** der Identity Provider mit eigenen bcrypt-Passwörtern. Das Dokument ist vollständig überholt (bestätigt in `docs/central-auth-worklog.md:6`) |
@@ -1364,7 +1372,7 @@ Jeder Schritt ist einzeln überprüfbar und – bis Phase E – einzeln rückneh
 | B7 | Portal `tests/handoff.test.ts` um `routeChangeRequest` erweitern (Cookie-Isolation, 401→303, 403, Body-Limit, Static-Bypass) | neue Tests grün |
 | **B8** | **Ein `test:handoff`-Pendant für CHANGE_REQUEST bauen** | ✅ **erledigt 22.09.2026.** `npm run test:handoff:change-request` im Portal-Repo. Startet beide Produktionsserver gegen zwei isolierte Wegwerf-Datenbanken, schaltet den echten Cloudflare-Adapter mit ephemeren Ed25519-Schlüsseln dazwischen und fährt die volle Kette durch. Lauf grün; mit absichtlich falschem Schlüssel schlägt er fehl, hat also Aussagekraft |
 | B9 | Negativtests: Replay, falsche Audience, manipulierter Body, fehlendes `externalId`, fehlende App-Rolle | ✅ **weitgehend erledigt** durch B8 und die fünf neuen Proxy-Tests. Offen: abgelaufene Assertion und `mustChangePassword` im Ende-zu-Ende-Lauf |
-| B10 | `docs/admin-portal-architecture.md` als überholt kennzeichnen oder ersetzen; READMEs korrigieren (Abschnitt 9, #1–#12) | Review |
+| B10 | Dokumentation bereinigen (Abschnitt 9) | ✅ **erledigt 22.09.2026.** Entra-Zielarchitektur nach `docs/archiv/` verschoben und mit Warnhinweis versehen; beide READMEs, beide `.env.example` und `PRODUCTION-ROLLOUT.md` korrigiert |
 | B11 | Prüfen, ob `src/modules/users/domain.ts`, `auth/password.ts`, `auth/sample-users.ts`, `auth/public-routes.ts` noch gebraucht werden | entfernt oder begründet behalten |
 | B12 | Beide Arbeitsbäume in Feature-Branches committen (noch kein `main`) | `git status` sauber, Branches gepusht. **Erst nach B5** |
 

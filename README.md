@@ -26,10 +26,16 @@ Die Anwendung ist anschließend unter `http://localhost:3000/aenderungsantrag` e
 
 ## Umgebungsvariablen
 
-| Variable             | Bedeutung                                                       |
-| -------------------- | --------------------------------------------------------------- |
-| `DATABASE_URL`       | PostgreSQL-Verbindungszeichenfolge für Prisma                   |
-| `AUTH_COOKIE_SECURE` | Für lokale HTTP-Entwicklung `false`, in HTTPS-Umgebungen `true` |
+| Variable | Bedeutung |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL-Verbindungszeichenfolge für Prisma |
+| `FALU_APP_SIGNING_PUBLIC_KEY` | Öffentlicher Ed25519-Schlüssel des Portals. Ohne ihn weist die Anwendung jede Anfrage ab |
+| `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` | Servicecredential für den signierten Verzeichnisabruf beim Portal |
+| `FALU_PORTAL_ORIGIN` | Öffentlicher Portal-Origin. Ohne Angabe `https://admin.falu.com` |
+| `FALU_PORTAL_SERVICE_ORIGIN` | Direkter Portal-Origin für den Verzeichnisabruf. Ohne Angabe wie `FALU_PORTAL_ORIGIN` |
+
+Der private Signaturschlüssel liegt ausschliesslich im Portal. Diese Anwendung erhält nur
+den öffentlichen Schlüssel und das eng begrenzte Verzeichnis-Credential.
 
 Keine produktiven Geheimnisse committen. `.env.example` enthält ausschließlich lokale Beispielwerte.
 
@@ -86,7 +92,11 @@ Die Anwendung ist ein modularer Next.js-Monolith:
 - `prisma`: Schema, Migrationen und Seed
 - `e2e`: Playwright-Browsertests
 
-Der aktuelle `SampleIdentityProvider` verwendet ein HTTP-only Cookie und feste Beispielbenutzer. Die Abstraktion `IdentityProvider` erlaubt später den Austausch gegen Microsoft Entra ID. Berechtigungen werden über explizite Permission-Schlüssel serverseitig geprüft.
+Die Anwendung besitzt **keine eigene Anmeldung**. Identität und fachliche Rollen kommen bei
+jeder Anfrage als signierte Assertion vom FALU Admin Portal; `src/proxy.ts` prüft sie
+kryptografisch, bevor irgendein Anwendungscode läuft. Berechtigungen werden darüber hinaus
+über explizite Permission-Schlüssel serverseitig geprüft. Details unten unter
+„Zentrale Anmeldung".
 
 Geschäftsmutationen sollen `withAudit` verwenden. Dadurch werden Datenänderung und Audit-Eintrag in derselben Datenbanktransaktion gespeichert. Eingereichte und abgeschlossene Datensätze werden in späteren Phasen nur archiviert beziehungsweise gesperrt, niemals hart gelöscht.
 
@@ -177,13 +187,23 @@ Next.js ist mit `basePath: "/aenderungsantrag"` gebaut. Normale `Link`- und Rout
 - Resend-Webhook: `https://admin.falu.com/aenderungsantrag/api/webhooks/resend`
 - Railway-Root `/`: leitet nicht authentifizierte Aufrufe auf `/aenderungsantrag/login` weiter; die Anwendung selbst bleibt unter dem Base Path erreichbar.
 
-Das Session-Cookie bleibt `HttpOnly`, `SameSite=Lax` und in Produktion `Secure`. Sein Pfad `/` erlaubt die Anmeldung unter dem Base Path und schwächt die übrigen Cookie-Sicherheitsattribute nicht.
+Die Anwendung setzt **kein eigenes Cookie mehr**. Der Cloudflare-Worker entfernt eingehende
+Cookies und `Authorization`-Header, bevor die Anfrage den Origin erreicht, und `src/proxy.ts`
+tut dasselbe noch einmal. Ein altes `falu-session`-Cookie im Browser bestimmt daher nirgends
+mehr Identität oder Rechte.
 
 ### Geplante Slack-Jobs auf Railway
 
 Inaktivität wird aus dem jüngsten fachlichen Audit-Ereignis eines eingereichten, noch offenen Änderungsantrags abgeleitet; `submittedAt` dient als Fallback. Seitenaufrufe und das allgemeine `updatedAt` zählen nicht. Nach sieben vollen Tagen wird der Antragsteller informiert, danach höchstens einmal pro weiterem Sieben-Tage-Fenster. Eine neue fachliche Aktivität startet das Fenster neu. Der persönliche Wochen-Digest fasst pro aktivem Benutzer alle zugewiesenen, nicht abgeschlossenen Aufgaben in genau einer Nachricht zusammen.
 
-Railway wertet Cron-Ausdrücke in UTC aus. Damit 08:00 Uhr `Europe/Zurich` sowohl in CET als auch CEST eingehalten wird, werden zwei kurze Cron-Services aus demselben Repository angelegt. Beide übernehmen dieselben Umgebungsvariablen wie der Web-Service und erhalten keinen öffentlichen Domainnamen:
+Railway wertet Cron-Ausdrücke in UTC aus. Damit 08:00 Uhr `Europe/Zurich` sowohl in CET als auch CEST eingehalten wird, läuft ein kurzer Cron-Service aus demselben Repository ohne öffentlichen Domainnamen.
+
+> **Die Variablen sind nicht identisch mit denen des Web-Service** — der Cron-Service hat
+> heute einen kleineren Satz. Er benötigt mindestens `DATABASE_URL`, `APP_BASE_URL`,
+> `SLACK_BOT_TOKEN`, `SLACK_NOTIFICATIONS_ENABLED` sowie seit der zentralen Anmeldung
+> zusätzlich `FALU_APP_SIGNING_PUBLIC_KEY` und `FALU_CHANGE_REQUEST_DIRECTORY_SECRET`.
+> Ohne die beiden letzten schlägt **jeder** Wochenlauf fehl, weil der Digest seine Empfänger
+> über den zentralen Verzeichnisabruf ermittelt.
 
 | Service | Start Command | Cron Schedule (UTC) |
 | --- | --- | --- |
@@ -200,7 +220,7 @@ Sicherer Produktions-Rollout:
 3. Zunächst `SLACK_NOTIFICATIONS_ENABLED=false` deployen und anschließend bewusst aktivieren.
 4. AVOR-/Technik-Freigabe, Aufgabenzuweisung, Ablehnung, Abschluss und Cron-Jobs kontrolliert testen.
 5. Outbox-Datensätze und sichere Fehlertexte prüfen; fehlende Slack-Benutzer in Slack beziehungsweise über übereinstimmende E-Mail-Adressen korrigieren.
-6. Resend-Konfiguration und Webhook für Passwort-Recovery unverändert beibehalten und Passwort-Reset separat testen.
+6. Resend-Konfiguration und Webhook betreffen nur noch Zustellquittungen für fachliche Benachrichtigungen. Passwort-Wiederherstellung findet ausschliesslich im Portal statt.
 
 ## Phase-4-Technische-Prüfung
 
@@ -209,31 +229,66 @@ Nach der Freigabe dokumentiert die Technik Sicherheit, Austauschbarkeit, Auswirk
 ## Phase-5-AVOR-Auswirkungsprüfung
 
 AVOR und Administration erfassen parallel zur technischen Prüfung die Auswirkungen auf Lagerbestand, Bestellungen, Produktionsaufträge und ausgelieferte Maschinen. Teilstände, Abschluss und begründetes Wiederöffnen werden vollständig auditiert. Sobald eine der beiden Umsetzungsprüfungen beginnt, wechselt der Antrag in `AVOR / Produktionsvorbereitung`; nach Abschluss beider Prüfungen erfolgt der transaktional abgesicherte Übergang zu `Einkauf / Beschaffung`.
-# Authentifizierung und Benutzerverwaltung (Phase 9)
+# Zentrale Anmeldung
 
-Die Anwendung verwendet eine interne E-Mail-/Passwort-Anmeldung. Passwörter werden mit bcrypt (Kostenfaktor 12) gehasht. Ein kryptografisch zufälliger Session-Token liegt in einem `HttpOnly`-, `SameSite=Lax`-Cookie (in Produktion zusätzlich `Secure`); PostgreSQL speichert ausschließlich dessen SHA-256-Hash. Sessions laufen nach sieben Tagen ab und werden bei Abmeldung, Deaktivierung oder Passwort-Reset invalidiert. Alle fachlichen Seiten und Server-Aktionen prüfen die Identität serverseitig.
+Die Anwendung hat **keine eigene Anmeldung und keine eigene Benutzerverwaltung mehr**.
+Identität, Aktivstatus und fachliche Rollen kommen ausschliesslich aus dem FALU Admin Portal.
 
-Sichtbare Rollen sind ausschließlich `Mitarbeiter`, `AVOR`, `Technik` und `Administrator`. Der Prozessschritt **Einkauf / Beschaffung** bleibt bestehen und kann von AVOR oder Administrator bearbeitet werden. Historische Einkauf-Rollen werden durch die Migration in AVOR überführt; Audittexte bleiben unverändert.
+## Wie eine Anfrage geprüft wird
 
-Administratoren verwalten weitere Konten unter `/admin/users`. Dort können sie Benutzer erstellen, bearbeiten, aktivieren/deaktivieren und ein temporäres Passwort setzen. Nach einem Reset ist beim nächsten Login eine Passwortänderung erforderlich. Historische Benutzer werden nie gelöscht, und der letzte aktive Administrator kann weder deaktiviert noch seiner Administratorrolle beraubt werden.
+1. Der Browser ruft `https://admin.falu.com/aenderungsantrag/...` auf.
+2. Der Cloudflare-Worker puffert den Rumpf, bildet dessen Hash und fragt das Portal mit
+   seinem Servicecredential und dem zentralen Sitzungscookie nach einer Identität.
+3. Das Portal prüft Sitzung, Aktivstatus, abgeschlossenen Passwortwechsel, freigeschalteten
+   App-Zugriff **und mindestens eine fachliche Rolle**. Erst dann signiert es eine
+   Ed25519-Assertion mit maximal **15 Sekunden** Lebensdauer, gebunden an Methode, exakten
+   Pfad samt Query und Rumpf-Hash.
+4. Der Worker reicht sie als `x-falu-assertion` weiter und entfernt dabei Cookies,
+   `Authorization` sowie alle `x-falu-*`, `x-middleware-*` und `x-forwarded-*` Header.
+5. `src/proxy.ts` prüft die Signatur unabhängig noch einmal, verifiziert die Request-Bindung
+   und verhindert Mehrfachverwendung über einen eindeutigen Eintrag in `AppAssertionUse`.
+6. `getSessionUser()` löst die lokale Benutzerzeile **ausschliesslich** über
+   `User.externalId` auf. Es gibt keinen Rückfall über die E-Mail-Adresse.
 
-## Ersten Produktions-Administrator einrichten
+Der Railway-Origin verlangt diese Assertion unabhängig vom Worker. Ein direkter Aufruf ohne
+gültigen, frischen Nachweis wird abgewiesen — gefälschte Identitätsheader nützen nichts.
 
-In Railway einmalig folgende Variablen setzen (Werte nicht protokollieren oder committen):
+## Rollen
 
-- `BOOTSTRAP_ADMIN_EMAIL`
-- `BOOTSTRAP_ADMIN_PASSWORD` (mindestens 10 Zeichen)
-- `BOOTSTRAP_ADMIN_FIRST_NAME`
-- `BOOTSTRAP_ADMIN_LAST_NAME`
+Sichtbare Rollen sind `Mitarbeiter`, `AVOR`, `Technik` und `Administrator`. Sie werden im
+Portal pro Benutzer für die Anwendung `Änderungsanträge` vergeben und stehen in jeder
+Assertion. Eine Portal-Administratorrolle erteilt **keine** Rechte in dieser Anwendung.
 
-Danach nicht-destruktiv ausführen:
+Der Prozessschritt **Einkauf / Beschaffung** bleibt bestehen und kann von AVOR oder
+Administration bearbeitet werden.
 
-```bash
-npx prisma migrate deploy
-NODE_ENV=production npm run db:seed
-npm run db:bootstrap-admin
-```
+## Benutzerverwaltung
 
-Existiert bereits ein aktiver Administrator, ändert der Bootstrap keine Zugangsdaten. `SEED_DEMO_USERS=true` ist ausschließlich für explizite Demo-Umgebungen vorgesehen; Produktions-Seeding legt standardmäßig keine Konten mit bekannten Passwörtern und keine Demo-Anträge an. Lokal verwenden die fiktiven Seed-Konten das nur für Entwicklung bestimmte Passwort `Falu-Dev-2026!`.
+Konten werden ausschliesslich unter `https://admin.falu.com/admin/users` verwaltet: anlegen,
+bearbeiten, aktivieren/deaktivieren, Passwort zurücksetzen sowie App-Zugriff und fachliche
+Rollen vergeben. Diese Anwendung hat dafür keine eigene Oberfläche mehr.
 
-Railway muss außerdem `DATABASE_URL` erhalten. Die sichere Cookie-Einstellung wird automatisch aus `NODE_ENV=production` abgeleitet und funktioniert hinter Railway HTTPS ohne fest codierte Domain. Ein verteilter Login-Rate-Limiter ist noch nicht vorhanden; vor breiter Produktionseinführung sollte er am Reverse Proxy oder in einem zentralen Store ergänzt werden. Microsoft Entra ID kann später die interne Anmeldung ersetzen, ohne die fachlichen Benutzer-, Rollen- oder Auditbeziehungen zu verändern.
+Die lokale `User`-Tabelle bleibt bestehen — sie trägt die gesamte Historie (Antragsteller,
+Freigaben, Prüfungen, Aufgaben, Kommentare, Anhänge, Audit). Ihre Zeilen werden nie gelöscht.
+Verknüpft sind beide Seiten über `User.externalId`.
+
+## Widerruf
+
+Jede Anfrage holt eine frische Assertion. Abmeldung, Deaktivierung, Entzug des App-Zugriffs
+und Entzug einer Rolle wirken damit ab dem nächsten Aufruf. Eine bereits ausgestellte, noch
+nicht verbrauchte Assertion bleibt höchstens 15 Sekunden gültig und ist nur einmal nutzbar.
+Bereits gestartete Vorgänge laufen zu Ende.
+
+## Prüfung
+
+Im Portal-Repository fährt `npm run test:handoff:change-request` die vollständige Kette
+Portal → Worker → Änderungsanträge gegen zwei isolierte Wegwerf-Datenbanken durch, mit
+ephemeren Schlüsseln und ohne Produktionsdaten.
+
+`SEED_DEMO_USERS=true` ist ausschliesslich für explizite Demo-Umgebungen vorgesehen;
+Produktions-Seeding legt standardmässig keine Konten mit bekannten Passwörtern und keine
+Demo-Anträge an. Lokal verwenden die fiktiven Seed-Konten das nur für Entwicklung bestimmte
+Passwort `Falu-Dev-2026!`. Diese Konten dienen nur der lokalen Entwicklung — anmelden kann
+man sich mit ihnen nicht mehr, weil es keine lokale Anmeldung gibt.
+
+Ratenbegrenzung für Anmeldeversuche liegt jetzt im Portal, nicht mehr hier.

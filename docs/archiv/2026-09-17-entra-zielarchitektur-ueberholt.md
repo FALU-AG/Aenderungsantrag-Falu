@@ -1,3 +1,25 @@
+> # ⚠️ ÜBERHOLT — nicht mehr umsetzen
+>
+> **Dieses Dokument beschreibt eine Zielarchitektur, die NICHT gebaut wurde.**
+> Es stammt vom 17.09.2026 und schlug Microsoft Entra ID als Identitätsquelle vor,
+> optional mit Cloudflare Access davor. Umgesetzt wurde etwas anderes:
+>
+> - Das **FALU Admin Portal selbst** ist die Identitätsquelle, mit eigenen bcrypt-Passwörtern.
+> - Kein Entra, kein OIDC, kein Cloudflare Access, keine JWKS.
+> - Die Identitätsübergabe erfolgt über **signierte Ed25519-Assertions** mit 15 Sekunden
+>   Lebensdauer, gebunden an die einzelne Anfrage.
+> - `User.externalId` speichert die **Portal-Benutzerkennung**, nicht den Entra-Object-ID.
+>
+> Aktueller Stand: [PHASE_A_ANALYSE.md](../PHASE_A_ANALYSE.md),
+> [PHASE_B_REVIEW.md](../PHASE_B_REVIEW.md) und der Abschnitt „Zentrale Anmeldung"
+> im [README](../../README.md).
+>
+> Aufbewahrt wird das Dokument allein als Nachweis der damals geprüften Optionen. Die
+> Abwägung in Abschnitt 4 bleibt lesenswert, falls die Frage je neu gestellt wird.
+> Alle konkreten Anweisungen darin sind hinfällig.
+
+---
+
 # FALU Admin Portal – Zielarchitektur für zentrale Anmeldung
 
 ## 1. Aktuelle Architektur

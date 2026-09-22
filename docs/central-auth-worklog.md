@@ -1,5 +1,7 @@
 # Arbeitsprotokoll – zentrale Änderungsantrag-Identität
 
+> **Status 22.09.2026: umgesetzt.** Dieses Dokument war der Plan vor der Implementierung und bleibt als Nachweis der Absicht stehen. Der tatsächliche Stand steht in docs/PHASE_A_ANALYSE.md und docs/PHASE_B_REVIEW.md.
+
 Stand 21.09.2026, vor Implementierung. Beide Ausgangsbäume sauber; Branch codex/central-auth-integration.
 
 ## Ist-Zustand und Ursache
