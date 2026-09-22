@@ -1,5 +1,10 @@
 # Sofortmassnahmen Betrieb
 
+> **Personen sind mit Platzhaltern bezeichnet.** Dieses Repository ist öffentlich; Namen
+> und Arbeitsadressen gehören nicht hinein. Die Zuordnung `Person A` bis `Person E` liegt
+> ausserhalb des Repositories. Wer die Arbeitsliste abarbeitet, hat sie.
+
+
 Stand 22.09.2026. Vier Punkte, die beim Erheben der Deployment-Konfiguration aufgefallen
 sind. Sie gehören **nicht** zur Auth-Umstellung, sollten aber vorher erledigt sein.
 
@@ -39,7 +44,7 @@ Supabase Storage.
 
 Der alte Schlüssel wird **zuletzt** gesperrt. Andersherum wären Anhänge sofort tot.
 
-1. **Supabase öffnen** → Projekt `ypxjblqaltcpvaubbmwg` → `Project Settings` → `API Keys`.
+1. **Supabase öffnen** → Projekt `‹Projektkennung›` → `Project Settings` → `API Keys`.
 2. **Neuen Secret Key erstellen** („Create new secret key" / „Generate new key").
    Den Wert einmal kopieren — er wird nur einmal angezeigt.
 3. **Railway öffnen** → Projekt `Aenderungsantrag Falu` → Dienst `Aenderungsantrag-Falu`

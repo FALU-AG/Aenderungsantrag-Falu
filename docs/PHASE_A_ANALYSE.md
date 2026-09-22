@@ -9,7 +9,7 @@ zu Produktionssystemen aufgebaut und keine Secrets ausgelesen.
 
 ## 0. Nachtrag 22.09.2026 – Entscheidungen und Verifikationslauf
 
-### 0.1 Getroffene Entscheidungen (Florian Kaufmann)
+### 0.1 Getroffene Entscheidungen (**Person A**)
 
 | Nr. | Frage | Entscheidung |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ Heute gilt `effectiveRoles()` (`src/modules/authorization/roles.ts:10`):
 
 **Wichtige Konsequenz, die vor der Umsetzung geklärt werden muss:** Personen, die heute nur
 `ADMINISTRATOR` haben und faktisch Freigaben erteilen, verlieren diese Befugnis. Sie brauchen
-im Portal zusätzlich explizit `AVOR` und/oder `TECHNICAL`. **Florian muss vor Phase C bestätigen,
+im Portal zusätzlich explizit `AVOR` und/oder `TECHNICAL`. **Person A muss vor Phase C bestätigen,
 wer von den fünf Konten künftig welche Rollen erhält.** Ohne diese Liste ist die Änderung nicht
 sicher durchführbar – sie könnte sonst alle Freigaben blockieren.
 
@@ -1106,7 +1106,7 @@ Risikoarme Reihenfolge:
 | 8 | Nach erfolgreicher Pilotphase: lokale Auth entfernen | **nein** (Code-Löschung) |
 
 Der aktuelle Arbeitsbaum überspringt Schritt 5 – er ist **Big-Bang statt Dual-Mode**.
-Das ist die wichtigste Entscheidung, die Florian treffen muss (siehe Abschnitt 10).
+Das ist die wichtigste Entscheidung, die **Person A** treffen muss (siehe Abschnitt 10).
 
 ### E. Lokale User-Daten, die zwingend erhalten bleiben müssen
 
@@ -1282,7 +1282,7 @@ Trotzdem bleiben konkrete Risiken:
 
 ---
 
-## 10. Offene Punkte / Entscheidungen, die Florian treffen muss
+## 10. Offene Punkte / Entscheidungen, die **Person A** treffen muss
 
 > **Stand 22.09.2026:** Die Entscheidungen 1, 3 und 5 sind getroffen (siehe Abschnitt 0.1) und
 > unten als *entschieden* markiert. Entscheidung 2 ist offen. Neu hinzugekommen ist
@@ -1320,7 +1320,7 @@ Vorschlag: einmalige Route oder Worker-Regel, die `falu-session` mit `Max-Age=0`
 Administrator, erteilt aber keine fachlichen Freigaben mehr. Damit folgt die CR-App derselben
 Philosophie wie das Portal („Roles are independent: ADMIN does not implicitly grant other
 functional roles", `src/lib/roles.ts:21`). Betroffene Code-Stellen: siehe Abschnitt 0.3.
-**Voraussetzung: Florian muss die Soll-Rollen der fünf Konten benennen (Entscheidung 13).**
+**Voraussetzung: **Person A** muss die Soll-Rollen der fünf Konten benennen (Entscheidung 13).**
 
 **Entscheidung 6 – E-Mail-Quelle: Portal oder lokal?**
 Aktuell kommt der Name aus dem Portal (`claims.name`), die E-Mail aus der lokalen Zeile
@@ -1361,7 +1361,7 @@ Services gewährleistet?
 Folgt zwingend aus Entscheidung 5. Für jedes der fünf Konten wird gebraucht: welche
 CHANGE_REQUEST-Rollen (`EMPLOYEE`, `AVOR`, `TECHNICAL`, `ADMINISTRATOR`) es künftig haben soll.
 Ohne diese Liste würde die Rollentrennung Freigaben blockieren, weil heutige „Nur-Administrator"-
-Konten ihre Freigabebefugnis verlieren. Ich liefere die Ist-Liste als Vorlage; Florian bestätigt
+Konten ihre Freigabebefugnis verlieren. Ich liefere die Ist-Liste als Vorlage; **Person A** bestätigt
 oder korrigiert sie.
 
 **Erledigter technischer Punkt:**
@@ -1384,7 +1384,7 @@ Jeder Schritt ist einzeln überprüfbar und – bis Phase E – einzeln rückneh
 
 | B# | Schritt | Status / Prüfkriterium |
 | --- | --- | --- |
-| B1 | Entscheidungen mit Florian klären | ✅ **erledigt 22.09.2026** – 8 Entscheidungen (Abschnitt 0.1); offen nur noch Entscheidung 13 (Soll-Rollen), gebunden an die Zugänge |
+| B1 | Entscheidungen mit **Person A** klären | ✅ **erledigt 22.09.2026** – 8 Entscheidungen (Abschnitt 0.1); offen nur noch Entscheidung 13 (Soll-Rollen), gebunden an die Zugänge |
 | B2 | Portal: `typecheck`, `lint`, `build`, `npm test` | ✅ **erledigt, alle grün** – 16 Routen, 51/51 Tests |
 | B3 | CR: `typecheck`, `lint`, `build`, `npm test` | ✅ **erledigt, alle grün nach B4** – 19 Routen, 473/473 Tests in 83 Dateien |
 | B4 | `"use server"` in `delegations/actions.ts` und `tasks/actions.ts` an den Dateianfang verschieben | ✅ **erledigt 22.09.2026.** Build grün, 6 Fehler entfallen, Lint ohne Warnungen |
@@ -1461,7 +1461,7 @@ unabhängig beurteilbare Auslieferung.
 
 | G# | Schritt | Prüfkriterium |
 | --- | --- | --- |
-| G1 | Ist-Rollenverteilung der fünf Konten lesend auslesen und Florian als Liste vorlegen (Entscheidung 7) | Liste vollständig, nur lesender Zugriff |
+| G1 | Ist-Rollenverteilung der fünf Konten lesend auslesen und **Person A** als Liste vorlegen (Entscheidung 7) | Liste vollständig, nur lesender Zugriff |
 | G2 | Soll-Rollen bestätigen lassen (Entscheidung 13) | Für jede Freigabeart existiert mindestens eine berechtigte aktive Person |
 | G3 | Fehlende Fachrollen im Portal nachtragen, **bevor** der Code ausgeliefert wird | Zuweisungen sichtbar in der Portal-UI |
 | G4 | Code ändern (Abschnitt 0.3): `effectiveRoles`, `rolePermissions`, `canEditAvorReview`, `canEditTechnicalReview`, `resolveApprovalAuthority`, `canFinalApprove`, `canRequestFinalChanges` | Administrator ohne Fachrolle kann keine Freigabe mehr erteilen; `canReopenClosed`, Löschen und Entwurfsbearbeitung bleiben ihm erhalten |
