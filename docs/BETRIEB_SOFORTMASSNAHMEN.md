@@ -139,12 +139,54 @@ Nur zur Vollständigkeit — diese kommen in Phase D, nicht heute:
 | Dienst | Fehlt noch |
 | --- | --- |
 | Portal | `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` |
-| Aenderungsantrag-Falu | `FALU_APP_SIGNING_PUBLIC_KEY`, `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` |
-| **Weekly Personal Digest** | `FALU_APP_SIGNING_PUBLIC_KEY`, `FALU_CHANGE_REQUEST_DIRECTORY_SECRET` |
+| Aenderungsantrag-Falu | `FALU_APP_SIGNING_PUBLIC_KEY`, `FALU_CHANGE_REQUEST_DIRECTORY_SECRET`, `FALU_PORTAL_SERVICE_ORIGIN` |
+| **Weekly Personal Digest** | `FALU_APP_SIGNING_PUBLIC_KEY`, `FALU_CHANGE_REQUEST_DIRECTORY_SECRET`, `FALU_PORTAL_SERVICE_ORIGIN` |
 
 Der Cron-Dienst wird dabei leicht übersehen: Er hat heute einen deutlich kleineren
 Variablensatz als der Web-Dienst — entgegen der Aussage in `README.md:186`. Ohne diese
 beiden Variablen schlägt nach der Umstellung **jeder** Wochenlauf fehl.
 
-`FALU_PORTAL_ORIGIN` und `FALU_PORTAL_SERVICE_ORIGIN` sind nicht zwingend: Der Code fällt
-auf `https://admin.falu.com` zurück (`portal-config.ts:2`).
+`FALU_PORTAL_ORIGIN` ist nicht zwingend: Der Code fällt auf `https://admin.falu.com`
+zurück (`portal-config.ts:2`).
+
+**`FALU_PORTAL_SERVICE_ORIGIN` dagegen schon** — bei beiden Diensten. Ohne die Variable
+fragt die Anwendung das Benutzerverzeichnis über `https://admin.falu.com` an, und dort
+beantwortet der Cloudflare Worker alles unter `/api/internal/change-request/` absichtlich
+mit 404. Die Variable muss auf die **Railway-Adresse des Portals** zeigen, nicht auf
+`admin.falu.com`. Ohne sie bleibt das Verzeichnis leer und niemand kommt herein.
+
+## 6. Ebenfalls später: die Herkunftssperre
+
+Heute sind alle drei Anwendungen auch unter ihrer Railway-Adresse direkt erreichbar, unter
+Umgehung von Cloudflare. Beim Portal reicht das bis zur Anmeldeseite.
+
+Der Worker markiert künftig jede Anfrage, die er weiterreicht; die Anwendungen weisen
+unmarkierte Anfragen ab. Gesteuert wird das über **eine** neue Variable, die überall
+denselben Wert trägt:
+
+| Dienst | Variable |
+| --- | --- |
+| Cloudflare Worker | `FALU_ORIGIN_LOCK` (als Secret) |
+| Portal | `FALU_ORIGIN_LOCK` |
+| Aenderungsantrag-Falu | `FALU_ORIGIN_LOCK` |
+
+Solange die Variable nirgends gesetzt ist, markiert der Worker nichts und die Anwendungen
+prüfen nichts. Deshalb lässt sich die Umstellung in Ruhe machen:
+
+1. Worker ausliefern.
+2. Beide Anwendungen ausliefern.
+3. Erst danach den Wert überall setzen.
+
+Das Entfernen der Variable schaltet die Sperre wieder ab, ohne Deployment.
+
+Ausgenommen von der Sperre bleiben `/health` beziehungsweise
+`/aenderungsantrag/api/health`, der von Resend signierte Webhook und beim Portal alles unter
+`/api/internal/`. Letzteres ist der gewollte Maschinenweg, der gar nicht über Cloudflare
+läuft: Dort holt der Worker die Ausweise und die Änderungsantrag-Anwendung das
+Benutzerverzeichnis. Jede dieser Routen prüft ihr eigenes Geheimnis.
+
+Zwei Dinge bleiben bewusst offen: Der Cron-Dienst **Weekly Personal Digest** spricht die
+Anwendung nicht über Cloudflare an — er braucht die Variable daher **nicht** und darf sie
+auch nicht bekommen, sonst sperrt er sich selbst aus. Und **Kundeneinsätze** erhält die
+Marke bereits, prüft sie aber noch nicht; jene Anwendung bleibt bis zu einer eigenen
+Änderung direkt erreichbar.

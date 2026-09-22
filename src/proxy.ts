@@ -4,6 +4,7 @@ import { portalOrigin, portalLogin } from "@/modules/auth/portal-config";
 import { ensureLocalUser } from "@/modules/auth/provisioning";
 import { db } from "@/server/db/client";
 import { withoutBasePath } from "@/lib/app-paths";
+import { arrivedThroughRouter, wrongDoor } from "@/lib/edge-lock";
 /** Fail-closed page. The portal link is omitted when its origin is not configured. */
 function denied(status: number, portal: string | null) {
   const link = portal ? '<a href="' + portal + '">Zum FALU Admin Portal</a>' : "";
@@ -11,6 +12,9 @@ function denied(status: number, portal: string | null) {
 }
 export async function proxy(request: NextRequest) {
   const pathname = withoutBasePath(new URL(request.url).pathname);
+  // Railway probes the container directly and Resend signs its own webhook, so neither can
+  // carry the mark the router sets. Everything else has to come through the router.
+  if (!["/api/health", "/api/webhooks/resend"].includes(pathname) && !arrivedThroughRouter(request.headers)) return wrongDoor();
   if ((["GET","HEAD"].includes(request.method) && (pathname.startsWith("/_next/static/") || ["/icon.svg","/api/health"].includes(pathname))) || pathname === "/api/webhooks/resend") return NextResponse.next();
   // Resolve the portal origin before anything can fail, so a misconfigured origin answers with
   // this page instead of throwing while the error path itself tries to build the portal link.
