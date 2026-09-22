@@ -8,5 +8,5 @@ test("zeigt Dashboard und Hauptnavigation", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toContainText("Änderungsanträge");
   await expect(page.getByText("Admin Falu")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Abmelden" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Abmelden" }).first()).toBeVisible();
 });

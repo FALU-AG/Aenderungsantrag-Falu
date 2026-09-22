@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { SAMPLE_USERS } from "../src/modules/auth/sample-users";
+import { centralId } from "../e2e/harness-identity";
 import { CHANGE_REASONS, MACHINE_TYPES } from "../src/modules/reference-data";
 
 const prisma = new PrismaClient();
@@ -49,6 +50,9 @@ async function main() {
     await prisma.user.upsert({
       where: { email: sample.email },
       update: {
+        // The demo accounts carry the same central mapping the browser-test harness signs,
+        // so the seeded requests, approvals and tasks belong to a resolvable identity.
+        externalId: centralId(sample.id),
         name: sample.name,
         firstName,
         lastName: lastNameParts.join(" "),
@@ -64,6 +68,7 @@ async function main() {
       },
       create: {
         id: sample.id,
+        externalId: centralId(sample.id),
         name: sample.name,
         firstName,
         lastName: lastNameParts.join(" "),
