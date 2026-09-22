@@ -9,7 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
-    ".next-validation/**",
+    // Matches .gitignore, which already allows suffixed validation builds.
+    ".next-validation*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

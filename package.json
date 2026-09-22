@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "db:reset-local-users": "tsx scripts/reset-local-users.ts",
     "db:cleanup-demo": "tsx scripts/cleanup-demo-data.ts",
     "db:delete-test-requests": "tsx scripts/delete-test-change-requests.ts",
     "production:cleanup": "tsx scripts/production-cleanup.ts",

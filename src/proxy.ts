@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authenticatePortalRequest, DomainError } from "@/modules/auth/portal-guard";
 import { portalOrigin, portalLogin } from "@/modules/auth/portal-config";
+import { ensureLocalUser } from "@/modules/auth/provisioning";
 import { db } from "@/server/db/client";
 import { withoutBasePath } from "@/lib/app-paths";
 /** Fail-closed page. The portal link is omitted when its origin is not configured. */
@@ -21,7 +22,7 @@ export async function proxy(request: NextRequest) {
     const claims = await authenticatePortalRequest(request, process.env.FALU_APP_SIGNING_PUBLIC_KEY, portalOrigin(), async (id, expiresAt) => {
       await db.$transaction(async (tx) => { await tx.appAssertionUse.deleteMany({ where: { expiresAt: { lte: new Date() } } }); await tx.appAssertionUse.create({ data: { id, expiresAt } }); });
     });
-    if (!await db.user.findUnique({ where: { externalId: claims.sub }, select: { id: true } })) throw new DomainError("mapping",403);
+    if (!await ensureLocalUser(claims.sub)) throw new DomainError("mapping",403);
     if (!["GET","HEAD","OPTIONS"].includes(request.method) && request.headers.get("origin") !== portalOrigin()) throw new DomainError("origin",403);
     const headers = new Headers(request.headers); headers.delete("cookie"); headers.delete("authorization"); headers.set("x-falu-pathname", pathname);
     const response = NextResponse.next({ request: { headers } }); response.headers.set("Cache-Control","no-store"); return response;
