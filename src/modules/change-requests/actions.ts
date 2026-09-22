@@ -19,6 +19,7 @@ import { submissionData } from "./submission";
 import { machineTypeChangeSummary } from "./machine-type-change";
 import { queueApprovalCycleNotifications } from "@/modules/notifications/workflow";
 import { sendNotifications } from "@/modules/notifications/service";
+import { warmCentralDirectory } from "@/modules/auth/directory";
 import { permanentlyDeleteChangeRequest } from "./delete-change-request";
 import { persistAttachmentUpload } from "./attachment-upload";
 
@@ -75,6 +76,8 @@ export async function saveChangeRequest(
   let requestId = id;
   let notificationIds: string[] = [];
 
+  // Submitting resolves approval recipients inside the transaction; warm the cache first.
+  await warmCentralDirectory();
   await db.$transaction(async (tx) => {
     if (id) {
       const existing = await tx.changeRequest.findUniqueOrThrow({
@@ -401,6 +404,7 @@ export async function submitExistingRequest(requestId: string) {
       : request.approvalCycle;
   const submission = submissionData(new Date(), cycle);
   let notificationIds: string[] = [];
+  await warmCentralDirectory();
   await db.$transaction(async (tx) => {
     const updated = await tx.changeRequest.updateMany({
       where: {

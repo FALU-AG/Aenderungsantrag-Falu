@@ -7,6 +7,7 @@ import { approvalAuditSummary, approvalDecisionSchema, resultingRequestStatus, s
 import { resolveApprovalAuthority } from "@/modules/delegations/authorization";
 import { queueRequestNotification } from "@/modules/notifications/workflow";
 import { sendNotifications } from "@/modules/notifications/service";
+import { warmCentralDirectory } from "@/modules/auth/directory";
 
 export type ApprovalActionState = { error?: string; success?: boolean };
 
@@ -18,6 +19,9 @@ export async function decideApproval(requestId: string, type: ApprovalTypeKey, _
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   try {
     let notificationIds: string[] = [];
+    // Resolve the recipient directory before opening the transaction. The lookup inside
+    // it is then served from cache, so a serializable transaction never waits on the portal.
+    await warmCentralDirectory();
     await db.$transaction(async (tx) => {
       const request = await tx.changeRequest.findUniqueOrThrow({ where: { id: requestId }, select: { status: true, approvalCycle: true } });
       if (request.status !== "UNDER_REVIEW") throw new Error("Der Antrag befindet sich nicht mehr in Prüfung.");

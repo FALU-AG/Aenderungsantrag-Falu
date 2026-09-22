@@ -15,4 +15,13 @@ describe("cryptographic origin protection",()=>{
  it("server action without verified identity fails",async()=>{expect((await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{method:"POST",headers:{origin:"https://admin.falu.com","next-action":"forged"}}))).status).toBe(401)});
  it.each(["login","forgot-password","reset-password","change-password"])("old %s redirects centrally",async(path)=>{expect((await proxy(new NextRequest("https://railway.invalid/aenderungsantrag/"+path))).headers.get("location")).toContain("https://admin.falu.com/login")});
  it("signed provider webhook remains independently authenticated",async()=>{expect((await proxy(new NextRequest("https://railway.invalid/aenderungsantrag/api/webhooks/resend",{method:"POST"}))).status).toBe(200)});
+ // The body binding is the only thing stopping a captured assertion from being reused with
+ // different form content on the same path and method.
+ it("request binding rejects a tampered body",async()=>{const r=await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{method:"POST",body:"decision=REJECTED",headers:{origin:"https://admin.falu.com","x-falu-assertion":assertion("/aenderungsantrag","POST","decision=APPROVED")}}));expect(r.status).toBe(403)});
+ it("accepts a matching body on the same binding",async()=>{const r=await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{method:"POST",body:"decision=APPROVED",headers:{origin:"https://admin.falu.com","x-falu-assertion":assertion("/aenderungsantrag","POST","decision=APPROVED")}}));expect(r.status).toBe(200)});
+ // Origin remains the CSRF boundary even once identity is proven.
+ it("rejects a foreign origin despite a valid assertion",async()=>{const r=await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{method:"POST",body:"x=1",headers:{origin:"https://evil.invalid","x-falu-assertion":assertion("/aenderungsantrag","POST","x=1")}}));expect(r.status).toBe(403)});
+ // The path every account without an externalId mapping takes.
+ it("rejects a verified identity that is not mapped locally",async()=>{mocks.findUnique.mockResolvedValue(null);const r=await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{headers:{"x-falu-assertion":assertion()}}));expect(r.status).toBe(403)});
+ it("forwards the verified path but no browser cookie",async()=>{const r=await proxy(new NextRequest("https://railway.invalid/aenderungsantrag",{headers:{cookie:"falu-session=B","x-falu-assertion":assertion()}}));const overridden=(r.headers.get("x-middleware-override-headers")??"").split(",").map((name)=>name.trim());expect(overridden).toContain("x-falu-pathname");expect(overridden).not.toContain("cookie")});
 });

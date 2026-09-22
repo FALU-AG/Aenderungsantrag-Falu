@@ -2,6 +2,7 @@ import { db } from "@/server/db/client";
 import { getWritingProvider, type WritingProvider, type WritingRequest } from "@/modules/ai/provider";
 import { queueCompletedRequestBroadcast } from "./workflow";
 import { sendNotifications } from "./service-core";
+import { warmCentralDirectory } from "@/modules/auth/directory";
 
 const TIMEOUT_MS = 20_000;
 
@@ -101,6 +102,7 @@ export async function generateAndBroadcastCompletionSummary(requestId: string, o
       return { status: "failed" as const, sent: 0 };
     }
   }
+  await warmCentralDirectory();
   const ids = await db.$transaction((tx) => queueCompletedRequestBroadcast(tx, requestId));
   await sendNotifications(ids);
   return { status: "completed" as const, sent: new Set(ids).size };

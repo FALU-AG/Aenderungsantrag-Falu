@@ -1,5 +1,5 @@
 "use server";
-import { centralUser } from "@/modules/auth/directory";
+import { centralUser, warmCentralDirectory } from "@/modules/auth/directory";
 import { revalidatePath } from "next/cache";
 import { db } from "@/server/db/client";
 import { getCurrentUser } from "@/modules/auth";
@@ -63,6 +63,7 @@ export async function createTask(
     };
   let notificationIds: string[] = [];
   await db.$transaction(async (tx) => {
+    // centralUser above already warmed the directory cache for the lookup inside here.
     const task = await tx.task.create({
       data: {
         ...parsed.data,
@@ -102,6 +103,8 @@ export async function updateTask(
   const parsed = taskSchema.safeParse(input(f));
   if (!parsed.success) return { errors: parsed.error.flatten().fieldErrors };
   let notificationIds: string[] = [];
+  // The transaction resolves the responsible person and the notification recipient.
+  await warmCentralDirectory();
   await db.$transaction(async (tx) => {
     const old = await tx.task.findUniqueOrThrow({
       where: { id: taskId },

@@ -1,5 +1,5 @@
 "use server";
-import { centralUser } from "@/modules/auth/directory";
+import { centralUser, warmCentralDirectory } from "@/modules/auth/directory";
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/modules/auth";
@@ -56,6 +56,7 @@ export async function createDelegation(formData: FormData) {
   if (input.startsAt <= new Date() && input.endsAt >= new Date()) {
     try {
       const open = await db.changeRequest.findMany({ where: { status: "UNDER_REVIEW", approvals: { some: { type: roleForScope(input.scope), status: "PENDING" } } }, select: { id: true, approvalCycle: true } });
+      await warmCentralDirectory();
       const ids = await db.$transaction(async (tx) => (await Promise.all(open.map((request) => queueApprovalCycleNotifications(tx, request.id, request.approvalCycle)))).flat());
       await sendNotifications(ids);
     } catch (error) {
