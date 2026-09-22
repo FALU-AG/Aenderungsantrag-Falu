@@ -5,11 +5,15 @@
  * In production the public host serves both the portal and the routed application; this
  * harness mirrors that on one loopback origin:
  *
- *   browser -> harness (mints a request-bound assertion) -> next dev
+ *   browser -> harness over TLS (mints a request-bound assertion) -> production build
  *
  * It signs with a keypair generated at startup, so no key material is stored anywhere. Which
  * person a request belongs to comes from an `e2e-identity` cookie that the test sets - it
  * replaces signing in, and the `/logout` stub clears it so the real Abmelden link works too.
+ *
+ * The application runs as a production build, because that is what is deployed - and because a
+ * development server behaves differently enough behind a proxy to produce failures that do not
+ * exist in production.
  *
  * It also brings its own database. The tests create, change and delete requests, tasks and audit
  * entries, so they must never touch a real one: the harness starts a throwaway PostgreSQL
@@ -19,7 +23,9 @@
  *
  * Everything here is test scaffolding. The application still verifies every assertion itself.
  */
-import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
+import { request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createTlsServer } from "node:https";
+import { readFileSync } from "node:fs";
 import { createServer as createSocketServer } from "node:net";
 import { generateKeyPairSync, sign, randomBytes, createHash } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -33,12 +39,15 @@ import { DATABASE_URL_FILE, E2E_DATABASE_DIR } from "./database";
 const HARNESS_PORT = Number(process.env.FALU_E2E_PORT ?? 3100);
 const APP_PORT = Number(process.env.FALU_E2E_APP_PORT ?? 3001);
 const PREFIX = "/aenderungsantrag";
-const ORIGIN = `http://127.0.0.1:${HARNESS_PORT}`;
+const ORIGIN = `https://127.0.0.1:${HARNESS_PORT}`;
+const DIST_DIR = ".next-validation-e2e";
 const TTL = 15;
 
 const keys = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
 const directorySecret = randomBytes(32).toString("hex");
 const runDir = resolve(E2E_DATABASE_DIR, `run-${randomBytes(6).toString("hex")}`);
+const certFile = resolve(runDir, "loopback-cert.pem");
+const keyFile = resolve(runDir, "loopback-key.pem");
 
 const identities = SAMPLE_USERS.map((user) => ({ id: centralId(user.id), name: user.name, email: user.email, roles: user.roles }));
 
@@ -112,14 +121,18 @@ async function forward(request: IncomingMessage, response: ServerResponse) {
   upstream.end();
 }
 
-const server = createServer((request, response) => {
-  const path = (request.url ?? "/").split("?")[0];
-  if (path === "/api/internal/change-request/directory") return directory(request, response);
-  if (path === "/logout") return page(response, 200, "<!doctype html><title>Abgemeldet</title><h1>Abgemeldet</h1>", "e2e-identity=; Path=/; Max-Age=0");
-  if (path === "/login") return page(response, 200, "<!doctype html><title>Anmelden</title><h1>Anmelden</h1>");
-  if (path === PREFIX || path.startsWith(`${PREFIX}/`)) { void forward(request, response); return; }
-  page(response, 404, "<!doctype html><title>Nicht gefunden</title>");
-});
+/** Built once the throwaway certificate exists, because the listener needs it. */
+function createHarnessServer() {
+  return createTlsServer({ key: readFileSync(keyFile), cert: readFileSync(certFile) }, (request, response) => {
+    const path = (request.url ?? "/").split("?")[0];
+    if (path === "/api/internal/change-request/directory") return directory(request, response);
+    if (path === "/logout") return page(response, 200, "<!doctype html><title>Abgemeldet</title><h1>Abgemeldet</h1>", "e2e-identity=; Path=/; Max-Age=0");
+    if (path === "/login") return page(response, 200, "<!doctype html><title>Anmelden</title><h1>Anmelden</h1>");
+    if (path === PREFIX || path.startsWith(`${PREFIX}/`)) { void forward(request, response); return; }
+    page(response, 404, "<!doctype html><title>Nicht gefunden</title>");
+  });
+}
+let server: ReturnType<typeof createHarnessServer> | undefined;
 
 let app: ChildProcess | undefined;
 let postgres: EmbeddedPostgres | undefined;
@@ -128,7 +141,7 @@ async function shutdown(code = 0) {
   if (stopping) return;
   stopping = true;
   app?.kill();
-  server.close();
+  server?.close();
   // Windows holds the data directory briefly after shutdown; leftovers are ignored by git.
   try { await postgres?.stop(); } catch { /* removed on the next run */ }
   try { await rm(runDir, { recursive: true, force: true }); } catch { /* as above */ }
@@ -147,13 +160,15 @@ function freePort() {
     });
   });
 }
-function run(args: string[], env: NodeJS.ProcessEnv) {
+function runCommand(command: string, args: string[], env: NodeJS.ProcessEnv) {
   return new Promise<void>((ok, fail) => {
-    const child = spawn(process.execPath, args, { env, stdio: "inherit", windowsHide: true });
+    const child = spawn(command, args, { env, stdio: "inherit", windowsHide: true });
     child.on("error", fail);
-    child.on("exit", (code) => code === 0 ? ok() : fail(new Error(`Test setup failed: ${args[0]}`)));
+    child.on("error", (error) => fail(new Error(`Test setup could not run ${command}: ${error.message}`)));
+    child.on("exit", (code) => code === 0 ? ok() : fail(new Error(`Test setup failed: ${command} ${args[0]}`)));
   });
 }
+const run = (args: string[], env: NodeJS.ProcessEnv) => runCommand(process.execPath, args, env);
 
 async function start() {
   // Playwright terminates its web server abruptly, so on Windows a previous run can leave a
@@ -161,6 +176,10 @@ async function start() {
   // leftover can never block the next start; sweeping the old ones is best effort.
   await mkdir(E2E_DATABASE_DIR, { recursive: true });
   await rm(runDir, { recursive: true, force: true }).catch(() => undefined);
+
+  // Throwaway certificate for the loopback listener, generated per run and never stored.
+  await mkdir(runDir, { recursive: true });
+  await runCommand("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", keyFile, "-out", certFile, "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"], { ...process.env, OPENSSL_CONF: "" });
 
   const password = randomBytes(24).toString("hex");
   const port = await freePort();
@@ -173,24 +192,34 @@ async function start() {
   await client.end();
 
   const databaseUrl = `postgresql://postgres:${password}@127.0.0.1:${port}/falu_e2e`;
-  const env = { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: "development" as const };
-  await run(["node_modules/prisma/build/index.js", "migrate", "deploy"], env);
-  await run(["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"], env);
+  const setup = { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: "development" as const };
+  await run(["node_modules/prisma/build/index.js", "migrate", "deploy"], setup);
+  await run(["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"], setup);
   // The specs need the same connection; Playwright cannot hand it back from the web server.
   await writeFile(DATABASE_URL_FILE, databaseUrl);
 
-  app = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(APP_PORT)], {
+  // The application runs as a production build, because that is what is deployed. It refuses a
+  // non-HTTPS portal origin in production, so the harness serves TLS with a throwaway
+  // certificate that the application trusts through NODE_EXTRA_CA_CERTS. That keeps the check
+  // under test instead of weakening it, and matches the portal's handoff test.
+  await run(["node_modules/next/dist/bin/next", "build"], { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: "production" as const, NEXT_DIST_DIR: DIST_DIR });
+
+  const appEnv = {
+    ...process.env,
+    DATABASE_URL: databaseUrl,
+    NODE_ENV: "production" as const,
+    NEXT_DIST_DIR: DIST_DIR,
+    NODE_EXTRA_CA_CERTS: certFile,
+    FALU_APP_SIGNING_PUBLIC_KEY: keys.publicKey,
+    FALU_CHANGE_REQUEST_DIRECTORY_SECRET: directorySecret,
+    FALU_PORTAL_ORIGIN: ORIGIN,
+    FALU_PORTAL_SERVICE_ORIGIN: ORIGIN,
+    APP_BASE_URL: `${ORIGIN}${PREFIX}`,
+  };
+  app = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(APP_PORT)], {
     // Both streams go to stderr: Playwright shows a web server's stderr but swallows its stdout,
     // and without the application's own log a failing run gives nothing to work with.
-    stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
-    env: {
-      ...env,
-      FALU_APP_SIGNING_PUBLIC_KEY: keys.publicKey,
-      FALU_CHANGE_REQUEST_DIRECTORY_SECRET: directorySecret,
-      FALU_PORTAL_ORIGIN: ORIGIN,
-      FALU_PORTAL_SERVICE_ORIGIN: ORIGIN,
-      APP_BASE_URL: `${ORIGIN}${PREFIX}`,
-    },
+    stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: appEnv,
   });
   app.stdout?.pipe(process.stderr);
   app.stderr?.pipe(process.stderr);
@@ -203,7 +232,8 @@ async function start() {
     if (app.exitCode !== null) throw new Error("The application stopped while starting up.");
     await new Promise((ok) => setTimeout(ok, 250));
   }
-  await new Promise<void>((ok) => server.listen(HARNESS_PORT, "127.0.0.1", ok));
+  server = createHarnessServer();
+  await new Promise<void>((ok) => server!.listen(HARNESS_PORT, "127.0.0.1", ok));
   console.log(`Browser-test harness on ${ORIGIN}, application on port ${APP_PORT}, throwaway database on port ${port}`);
 }
 

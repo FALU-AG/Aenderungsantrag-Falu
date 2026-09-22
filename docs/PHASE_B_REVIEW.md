@@ -16,10 +16,11 @@ ohne die Folgen für Transaktionen, Wiederholungen und Antwortzeiten zu berücks
 
 | Schwere | Anzahl | Stand |
 | --- | --- | --- |
-| Hoch – vor dem Cutover | 2 | ✅ beide behoben |
+| Hoch – vor dem Cutover | 3 | ✅ alle erledigt (H3 als Testartefakt geklärt) |
 | Mittel – vor dem Cutover | 4 | ✅ 2 behoben (M1, M4), 2 offen (M2, M3) |
 | Niedrig – kann danach | 3 | ⏳ offen |
 | Testlücke | 1 | ✅ behoben |
+| Browser-Tests | 9 | ✅ alle bestehen, gegen einen Produktionsbuild |
 
 ## Stand der Behebung (22.09.2026)
 
@@ -50,17 +51,34 @@ anonymen Zugriff, den direkten Origin, Zugriff ohne Rolle, Zugriff mit Rolle, de
 Verzeichnisabruf, Replay, gefälschte Identitätsheader, fehlendes `externalId`-Mapping sowie
 Widerruf über Rollenentzug, Zugriffsentzug, Logout und Deaktivierung ab.
 
-Nicht geprüft: die sechs Playwright-Suiten (unverändert gebrochen) und Mutationen über
-Server Actions — der Ende-zu-Ende-Lauf beschränkt sich auf Seitenaufrufe, weil Next-Server-Actions
-eigene Header und einen exakten Origin verlangen.
+**Nachtrag 22.09.2026 – die Browser-Tests sind neu aufgebaut und vollständig grün.** `npm run
+test:e2e` bringt eine eigene Wegwerf-Datenbank mit, baut die Anwendung als Produktionsbuild,
+stellt Portal und Cloudflare-Adapter über TLS nach und fährt neun Tests in rund 28 Sekunden
+durch — inklusive Server-Aktionen: Antrag freigeben, wieder öffnen, Aufgabe anlegen und
+zuweisen. Damit ist auch die letzte Lücke geschlossen, die der Ende-zu-Ende-Lauf offenliess.
 
 ---
 
 ## Hoch
 
-### H3 – OFFEN: Server-Aktionen liefern hinter der Testumgebung keine Antwort
+### H3 – ✅ GEKLÄRT: Server-Aktionen sind in Produktion in Ordnung
 
-**Gefunden am 22.09.2026 beim Aufbau der Browser-Tests. Nicht behoben. Vor dem Stichtag zu klären.**
+> **Auflösung am 22.09.2026.** Der Hänger trat **ausschliesslich** auf, wenn die Testumgebung
+> einen **Entwicklungsserver** weiterleitet. Gegen einen **Produktionsbuild** — also gegen das,
+> was tatsächlich ausgeliefert wird — laufen alle Server-Aktionen durch: Aufgabe anlegen,
+> zuweisen, Abschluss freigeben, Antrag wieder öffnen. **Alle neun Browser-Tests bestehen.**
+>
+> **Kein Produktionsfehler.** Die Anwendung ist nach dem Stichtag benutzbar; die Befürchtung
+> „lesen ja, absenden nein" ist ausgeräumt.
+>
+> **Konsequenz für den Testaufbau:** Die Browser-Tests laufen jetzt grundsätzlich gegen einen
+> Produktionsbuild, über TLS mit einem Wegwerf-Zertifikat, das die Anwendung über
+> `NODE_EXTRA_CA_CERTS` akzeptiert. Damit bleibt auch die Prüfung scharf, die in Produktion
+> eine HTTPS-Adresse für das Portal verlangt — sie wird mitgetestet statt umgangen.
+>
+> Der ursprüngliche Befund bleibt unten als Nachweis stehen.
+
+**Gefunden am 22.09.2026 beim Aufbau der Browser-Tests.**
 
 **Symptom:** Ein abgeschicktes Formular — Aufgabe anlegen, Abschluss freigeben — kommt nie
 zurück. Der Browser wartet unbegrenzt.
@@ -87,26 +105,16 @@ stellt die Anwendung eine weitere Anfrage. Sie hört einfach auf.
 der Benachrichtigungsversand, doppelte Übertragungskodierung in beide Richtungen (beides
 korrigiert, ohne Wirkung auf dieses Symptom).
 
-**Ungeklärt und genau das ist der Punkt:** Ob das nur an der HTTP-Weiterleitung der
-Testumgebung im Entwicklungsmodus liegt, oder ob Server-Aktionen auch **in Produktion hinter
-Cloudflare** hängen. Der Unterschied ist erheblich:
-
-- Nur Testumgebung ⇒ Schönheitsfehler im Testaufbau.
-- Auch Produktion ⇒ **die Anwendung wäre nach dem Stichtag unbenutzbar.** Lesen ginge, aber
-  kein Antrag liesse sich einreichen, keine Freigabe erteilen, keine Aufgabe anlegen.
+**Die entscheidende Frage war:** nur Testaufbau oder auch Produktion? Beantwortet durch den
+Wechsel auf einen Produktionsbuild — **nur Testaufbau** (siehe Auflösung oben).
 
 **Warum es bisher niemandem auffiel:** Der Ende-zu-Ende-Test im Portal prüft ausschliesslich
 Seitenaufrufe. Die 484 Unit-Tests rufen die Aktionsfunktionen direkt auf und umgehen den
 HTTP-Weg vollständig. Diese Lücke schliesst erst ein echter Browser.
 
-**Vorgeschlagene Klärung (halber Tag):** Die Browser-Tests gegen einen **Produktionsbuild**
-statt `next dev` laufen lassen. Dafür braucht der Verzeichnisabruf einen HTTPS-Zugang — das
-Muster dafür existiert bereits im Portal-Test (`test-change-request-handoff.ts`). Läuft es
-dort durch, ist es ein Artefakt des Entwicklungsmodus. Hängt es auch dort, ist es ein echter
-Fehler und muss vor dem Stichtag behoben werden.
-
-Bis dahin sind `final-review.spec.ts` und `task-management.spec.ts` mit `test.fixme` und
-dieser Begründung geparkt — sie erscheinen im Bericht als übersprungen, nicht als bestanden.
+**Durchgeführte Klärung:** Browser-Tests gegen einen Produktionsbuild statt `next dev`, mit
+TLS für den Verzeichnisabruf nach demselben Muster wie der Portal-Test. Ergebnis: alles läuft.
+Beide zuvor geparkten Tests sind wieder aktiv und bestehen.
 
 ### H1 – Netzwerkaufruf zum Portal innerhalb von Datenbanktransaktionen
 

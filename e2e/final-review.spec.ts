@@ -47,13 +47,7 @@ test.afterEach(async () => {
   ]);
 });
 test.afterAll(async () => prisma.$disconnect());
-// OFFEN: Server-Aktionen liefern hinter der Testumgebung keine Antwort. Die Aktion selbst
-// laeuft vollstaendig durch - die Aufgabe wird angelegt, Benachrichtigungen werden erzeugt -
-// aber Next sendet danach keine Antwort, und der Browser wartet unbegrenzt. Eingegrenzt bis:
-// Proxy fertig, Aktion fertig, danach nichts. Ungeklaert, ob das nur am HTTP-Weiterleiten der
-// Testumgebung im Entwicklungsmodus liegt oder auch in Produktion hinter Cloudflare auftritt.
-// Siehe docs/PHASE_B_REVIEW.md, Befund H3. Muss vor dem Stichtag geklaert sein.
-test.fixme("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
+test("blockiert, genehmigt, schliesst und öffnet einen Antrag erneut", async ({
   page,
 }) => {
   test.setTimeout(90000);

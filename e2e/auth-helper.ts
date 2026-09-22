@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { SAMPLE_USERS } from "../src/modules/auth/sample-users";
 import { centralId } from "./harness-identity";
 
-const HARNESS_ORIGIN = process.env.FALU_E2E_ORIGIN ?? `http://127.0.0.1:${process.env.FALU_E2E_PORT ?? 3100}`;
+const HARNESS_ORIGIN = process.env.FALU_E2E_ORIGIN ?? `https://127.0.0.1:${process.env.FALU_E2E_PORT ?? 3100}`;
 
 /**
  * There is no login to drive any more: the portal decides who someone is, and the harness
