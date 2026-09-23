@@ -23,8 +23,8 @@ describe("AttachmentOverviewCard", () => {
   it("verlinkt jede Datei ausschließlich über die authentifizierte Anwendungsroute", () => {
     render(<AttachmentOverviewCard requestId="cr-1" attachments={attachments} />);
     expect(screen.getAllByRole("link", { name: "Öffnen" }).map((link) => link.getAttribute("href"))).toEqual([
-      "/change-requests/cr-1/attachments/a1",
-      "/change-requests/cr-1/attachments/a2",
+      "/aenderungsantrag/change-requests/cr-1/attachments/a1",
+      "/aenderungsantrag/change-requests/cr-1/attachments/a2",
     ]);
   });
 
@@ -45,5 +45,20 @@ describe("AttachmentOverviewCard", () => {
     expect(attachmentTypeLabel("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe("Excel");
     expect(formatAttachmentSize(500)).toBe("500 B");
     expect(formatAttachmentSize(245 * 1024)).toBe("245 KB");
+  });
+});
+
+describe("Ziel des Öffnen-Links", () => {
+  // Produktionsfehler vom 23.09.2026: Der Link war ein einfacher <a>, und ein einfacher Anker
+  // bekommt den Präfix der Anwendung nicht automatisch wie ein Next-<Link>. Der Browser landete
+  // damit auf admin.falu.com/change-requests/... - also beim Portal, das dort mit 404 antwortet.
+  it("beginnt mit dem Präfix der Anwendung, sonst landet er beim Portal", () => {
+    render(<AttachmentOverviewCard requestId="cr-1" attachments={attachments} />);
+
+    const links = screen.getAllByRole("link", { name: "Öffnen" });
+    expect(links).toHaveLength(attachments.length);
+    for (const link of links) {
+      expect(link.getAttribute("href")).toMatch(/^\/aenderungsantrag\/change-requests\/cr-1\/attachments\//);
+    }
   });
 });

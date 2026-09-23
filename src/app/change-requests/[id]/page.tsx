@@ -1000,7 +1000,7 @@ function Attachments({
             )}
             <div className="min-w-0 flex-1">
               <a
-                href={`/change-requests/${id}/attachments/${a.id}`}
+                href={withBasePath(`/change-requests/${id}/attachments/${a.id}`)}
                 className="block truncate text-sm font-medium text-[#175f91]"
               >
                 {a.originalName}

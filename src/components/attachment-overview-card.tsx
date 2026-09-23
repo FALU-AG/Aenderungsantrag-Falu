@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatDateTimeZurich } from "@/lib/date-time";
+import { withBasePath } from "@/lib/app-paths";
 
 export type AttachmentOverviewItem = {
   id: string;
@@ -68,7 +69,7 @@ export function AttachmentOverviewCard({
                 </p>
               </div>
               <a
-                href={`/change-requests/${requestId}/attachments/${attachment.id}`}
+                href={withBasePath(`/change-requests/${requestId}/attachments/${attachment.id}`)}
                 className="w-fit shrink-0 text-sm font-semibold text-[#175f91] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#175f91]"
               >
                 Öffnen
