@@ -2,7 +2,9 @@ import type { StorageProvider } from "@prisma/client";
 import { db } from "@/server/db/client";
 import { removeStoredAttachment } from "@/server/storage/attachment-storage";
 
-export const TEST_REQUEST_NUMBERS = ["CR-2026-028", "CR-2026-029"] as const;
+// Welche Anträge gelöscht werden, sagt der Aufrufer. Nichts ist vorbelegt: Wer löscht,
+// muss jede Nummer ausschreiben, und gefunden werden muss exakt diese Menge.
+export const REQUEST_NUMBER_PATTERN = /^CR-\d{4}-\d{3}$/;
 type CleanupDatabase = typeof db;
 type StorageRemoval = (provider: StorageProvider, key: string) => Promise<void>;
 type RelationCounts = {
@@ -14,7 +16,8 @@ type RelationCounts = {
 type RequestSummary = { id: string; number: string; counts: RelationCounts; attachments: { id: string; changeRequestId: string; storageProvider: StorageProvider; storageKey: string }[] };
 export type TestRequestCleanupResult = { executed: boolean; requests: RequestSummary[]; unrelatedRequestsBefore: number; unrelatedRequestsAfter: number; usersBefore: number; usersAfter: number };
 
-const exactTargets = (numbers: string[]) => numbers.length === 2 && [...numbers].sort().every((number, index) => number === [...TEST_REQUEST_NUMBERS].sort()[index]);
+const exactTargets = (found: string[], expected: readonly string[]) =>
+  found.length === expected.length && [...found].sort().every((number, index) => number === [...expected].sort()[index]);
 
 async function relationCounts(client: CleanupDatabase, requestId: string, taskIds: string[]): Promise<RelationCounts> {
   const where = { changeRequestId: requestId };
@@ -29,10 +32,17 @@ async function relationCounts(client: CleanupDatabase, requestId: string, taskId
   return { changeRequest: 1, machineTypes, reasons, approvals, finalApprovals, technicalReviews, avorReviews, purchasingReviews, tasks, attachments, comments, auditEvents, notifications };
 }
 
-function validateResolvedRequests(requests: { id: string; number: string }[]) {
-  if (requests.length !== 2 || !exactTargets(requests.map(({ number }) => number)))
-    throw new Error("Abbruch: CR-2026-028 und CR-2026-029 müssen beide und ausschliesslich vorhanden sein.");
-  if (new Set(requests.map(({ id }) => id)).size !== 2) throw new Error("Abbruch: Die Zielanträge konnten nicht eindeutig aufgelöst werden.");
+function validateTargetNumbers(numbers: readonly string[]) {
+  if (!numbers.length) throw new Error("Abbruch: Es wurde keine Antragsnummer angegeben.");
+  if (new Set(numbers).size !== numbers.length) throw new Error("Abbruch: Eine Antragsnummer wurde doppelt angegeben.");
+  const invalid = numbers.filter((number) => !REQUEST_NUMBER_PATTERN.test(number));
+  if (invalid.length) throw new Error(`Abbruch: Ungültige Antragsnummer: ${invalid.join(", ")}.`);
+}
+
+function validateResolvedRequests(requests: { id: string; number: string }[], expected: readonly string[]) {
+  if (!exactTargets(requests.map(({ number }) => number), expected))
+    throw new Error(`Abbruch: ${expected.join(" und ")} müssen alle und ausschliesslich vorhanden sein.`);
+  if (new Set(requests.map(({ id }) => id)).size !== expected.length) throw new Error("Abbruch: Die Zielanträge konnten nicht eindeutig aufgelöst werden.");
 }
 
 function validateAttachmentKey(attachment: RequestSummary["attachments"][number]) {
@@ -40,12 +50,13 @@ function validateAttachmentKey(attachment: RequestSummary["attachments"][number]
     throw new Error(`Abbruch: unsicherer Storage-Pfad für Anhang ${attachment.id}.`);
 }
 
-export async function deleteTestChangeRequests(client: CleanupDatabase, execute = false, removeStorage: StorageRemoval = removeStoredAttachment): Promise<TestRequestCleanupResult> {
+export async function deleteTestChangeRequests(client: CleanupDatabase, numbers: readonly string[], execute = false, removeStorage: StorageRemoval = removeStoredAttachment): Promise<TestRequestCleanupResult> {
+  validateTargetNumbers(numbers);
   const resolved = await client.changeRequest.findMany({
-    where: { number: { in: [...TEST_REQUEST_NUMBERS] } }, orderBy: { number: "asc" },
+    where: { number: { in: [...numbers] } }, orderBy: { number: "asc" },
     select: { id: true, number: true, tasks: { select: { id: true } }, attachments: { select: { id: true, changeRequestId: true, storageProvider: true, storageKey: true } } },
   });
-  validateResolvedRequests(resolved);
+  validateResolvedRequests(resolved, numbers);
   const requestIds = resolved.map(({ id }) => id);
   const [unrelatedRequestsBefore, usersBefore] = await Promise.all([
     client.changeRequest.count({ where: { id: { notIn: requestIds } } }), client.user.count(),
@@ -61,8 +72,8 @@ export async function deleteTestChangeRequests(client: CleanupDatabase, execute 
     await removeStorage(attachment.storageProvider, attachment.storageKey);
 
   await client.$transaction(async (tx) => {
-    const locked = await tx.changeRequest.findMany({ where: { id: { in: requestIds }, number: { in: [...TEST_REQUEST_NUMBERS] } }, select: { id: true, number: true, attachments: { select: { id: true } } } });
-    validateResolvedRequests(locked);
+    const locked = await tx.changeRequest.findMany({ where: { id: { in: requestIds }, number: { in: [...numbers] } }, select: { id: true, number: true, attachments: { select: { id: true } } } });
+    validateResolvedRequests(locked, numbers);
     const expectedAttachmentIds = requests.flatMap(({ attachments }) => attachments.map(({ id }) => id)).sort();
     const currentAttachmentIds = locked.flatMap(({ attachments }) => attachments.map(({ id }) => id)).sort();
     if (expectedAttachmentIds.join("|") !== currentAttachmentIds.join("|")) throw new Error("Abbruch: Die Anhänge haben sich seit dem Dry Run geändert.");
@@ -79,12 +90,12 @@ export async function deleteTestChangeRequests(client: CleanupDatabase, execute 
     await tx.attachment.deleteMany({ where: { changeRequestId: { in: requestIds } } });
     await tx.comment.deleteMany({ where: { changeRequestId: { in: requestIds } } });
     await tx.auditEvent.deleteMany({ where: { changeRequestId: { in: requestIds } } });
-    const deleted = await tx.changeRequest.deleteMany({ where: { id: { in: requestIds }, number: { in: [...TEST_REQUEST_NUMBERS] } } });
-    if (deleted.count !== 2) throw new Error("Abbruch: Es wurden nicht exakt zwei Zielanträge gelöscht.");
+    const deleted = await tx.changeRequest.deleteMany({ where: { id: { in: requestIds }, number: { in: [...numbers] } } });
+    if (deleted.count !== numbers.length) throw new Error(`Abbruch: Es wurden nicht exakt ${numbers.length} Zielanträge gelöscht.`);
   }, { isolationLevel: "Serializable" });
 
   const [remainingTargets, unrelatedRequestsAfter, usersAfter] = await Promise.all([
-    client.changeRequest.count({ where: { number: { in: [...TEST_REQUEST_NUMBERS] } } }),
+    client.changeRequest.count({ where: { number: { in: [...numbers] } } }),
     client.changeRequest.count({ where: { id: { notIn: requestIds } } }), client.user.count(),
   ]);
   if (remainingTargets !== 0 || unrelatedRequestsAfter !== unrelatedRequestsBefore || usersAfter !== usersBefore)
