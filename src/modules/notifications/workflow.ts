@@ -46,7 +46,11 @@ export async function queueApprovalCycleNotifications(tx: Prisma.TransactionClie
   const request = await requestSummary(tx, requestId);
   const ids: string[] = [];
   const now = new Date();
-  const directory = await centralUsers();
+  // Muss die laufende Transaktion benutzen. Mit dem globalen Client verlangt diese Zeile
+  // eine zweite Verbindung aus demselben Pool, waehrend die Transaktion bereits eine haelt:
+  // Bei mehreren gleichzeitigen Einreichungen wartet sie auf eine Verbindung, die erst nach
+  // ihrem eigenen Ende frei wird, und laeuft nach 5 s in P2028.
+  const directory = await centralUsers(tx);
   for (const type of ["AVOR", "TECHNICAL"] as const) {
     const [directRecipients, delegations] = await Promise.all([
       activeRoleRecipients(tx, type),

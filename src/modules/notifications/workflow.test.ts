@@ -1,4 +1,4 @@
-vi.mock("@/modules/auth/directory",()=>({centralUser:async()=>({id:"user-1",email:"user@falu.ch",name:"User"}),centralUsers:async()=> (await tx.user.findMany()) ?? ["sub","avor","tech"].map(id=>({id,email:id+"@falu.ch",name:id,roles:[{role:{key:id==="avor"?"AVOR":id==="tech"?"TECHNICAL":"EMPLOYEE"}}]}))}));
+vi.mock("@/modules/auth/directory",()=>({centralUser:async()=>({id:"user-1",email:"user@falu.ch",name:"User"}),centralUsers:async(client?:unknown)=> (directoryClients.push(client), await tx.user.findMany()) ?? ["sub","avor","tech"].map(id=>({id,email:id+"@falu.ch",name:id,roles:[{role:{key:id==="avor"?"AVOR":id==="tech"?"TECHNICAL":"EMPLOYEE"}}]}))}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ activeRoleRecipients: vi.fn(), requestRecipient: vi.fn(), queue: vi.fn() }));
@@ -7,6 +7,7 @@ vi.mock("./repository", () => ({ queueNotification: mocks.queue }));
 import { queueApprovalCycleNotifications, queueCompletedRequestBroadcast, queueRequestNotification, queueTaskAssignmentNotification } from "./workflow";
 
 const request = { id: "cr-1", number: "CR-2026-001", title: "Riemenspanner", description: "Spannung verbessert", status: "UNDER_REVIEW", applicantName: "Anna Antrag", approvalCycle: 1, finalReviewCycle: 1, finalComment: null, closedAt: null, machineTypes: [{ machineType: { code: "M1" } }] };
+const directoryClients: unknown[] = [];
 const tx = {
   changeRequest: { findUniqueOrThrow: vi.fn().mockResolvedValue(request) },
   user: { findMany: vi.fn() },
@@ -22,6 +23,7 @@ describe("workflow notification orchestration", () => {
     mocks.activeRoleRecipients.mockImplementation(async (_tx, role) => role === "AVOR" ? [{ id: "avor", email: "avor@falu.ch", name: "Anna AVOR" }] : [{ id: "tech", email: "tech@falu.ch", name: "Theo Technik" }]);
     mocks.requestRecipient.mockResolvedValue({ id: "applicant", email: "applicant@falu.ch", name: "Anna Antrag" });
     tx.approvalDelegation.findMany.mockResolvedValue([]); tx.user.findMany.mockReset();
+    directoryClients.length = 0;
   });
 
   it("notifies an active substitute without duplicating a direct recipient", async () => {
@@ -63,5 +65,29 @@ describe("workflow notification orchestration", () => {
     tx.changeRequest.findUniqueOrThrow.mockResolvedValue({ ...request, status, finalComment: "Noch nicht abgeschlossen", closedAt: null });
     expect(await queueCompletedRequestBroadcast(tx as never, "cr-1")).toEqual([]);
     expect(tx.user.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("Datenbankverbindungen innerhalb der Transaktion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.APP_BASE_URL = "https://admin.falu.com/aenderungsantrag";
+    mocks.queue.mockImplementation(async (_tx, input) => ({ id: input.idempotencyKey }));
+    mocks.activeRoleRecipients.mockResolvedValue([]);
+    tx.approvalDelegation.findMany.mockResolvedValue([]);
+    tx.user.findMany.mockReset();
+    directoryClients.length = 0;
+  });
+
+  // Produktionsfehler vom 23.09.2026: Diese Abfrage lief auf dem globalen Client und verlangte
+  // damit eine zweite Verbindung, waehrend die Transaktion bereits eine hielt. Bei mehreren
+  // gleichzeitigen Einreichungen wartete sie auf eine Verbindung, die erst nach ihrem eigenen
+  // Ende frei geworden waere - die Transaktion lief nach 5 s in P2028 und das Einreichen
+  // scheiterte mit "A server error occurred".
+  it("holt das Benutzerverzeichnis über die laufende Transaktion, nie über eine zweite Verbindung", async () => {
+    await queueApprovalCycleNotifications(tx as never, "cr-1", 1);
+
+    expect(directoryClients.length).toBeGreaterThan(0);
+    for (const client of directoryClients) expect(client).toBe(tx);
   });
 });
