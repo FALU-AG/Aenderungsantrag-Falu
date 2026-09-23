@@ -22,6 +22,7 @@ import { sendNotifications } from "@/modules/notifications/service";
 import { warmCentralDirectory } from "@/modules/auth/directory";
 import { permanentlyDeleteChangeRequest } from "./delete-change-request";
 import { persistAttachmentUpload } from "./attachment-upload";
+import { machineCodeSchema, resolveMachineCode, retiredMachineMessage } from "./machine-type-catalog";
 
 export type FormState = { errors?: Record<string, string[]>; message?: string; savedRequestId?: string };
 export type AttachmentActionState = { error?: string; success?: string };
@@ -475,4 +476,61 @@ export async function deleteChangeRequest(requestId: string, _state: DeleteChang
   revalidatePath("/");
   revalidatePath("/change-requests");
   redirect("/change-requests");
+}
+
+export type MachineTypeActionState = {
+  error?: string;
+  notice?: string;
+  machineType?: { id: string; label: string; active: boolean };
+};
+
+/**
+ * Adds a machine to the catalogue from the selection in the form. Everyone who may write a
+ * request may do this: a machine nobody had entered yet used to stop the request outright,
+ * and asking a colleague first is exactly the delay this removes.
+ *
+ * The catalogue is protected by recognising what is already there rather than by permissions.
+ */
+export async function createMachineType(rawCode: string): Promise<MachineTypeActionState> {
+  const user = await getCurrentUser();
+  requirePermission(user, "CHANGE_REQUEST_CREATE");
+  const parsed = machineCodeSchema.safeParse(rawCode);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const code = parsed.data;
+
+  const catalogue = await db.machineType.findMany({ select: { id: true, code: true, active: true } });
+  const outcome = resolveMachineCode(code, catalogue);
+  if (outcome.kind === "retired") return { error: retiredMachineMessage(outcome.entry) };
+  if (outcome.kind === "existing")
+    return {
+      machineType: { id: outcome.entry.id, label: outcome.entry.code, active: true },
+      notice: `„${outcome.entry.code}" gibt es bereits und ist jetzt ausgewählt.`,
+    };
+
+  try {
+    const created = await db.$transaction(async (tx) => {
+      const row = await tx.machineType.create({ data: { code, name: code }, select: { id: true, code: true } });
+      await tx.auditEvent.create({
+        data: {
+          userId: user.id,
+          action: "MACHINE_TYPE_CREATED",
+          entityType: "MachineType",
+          entityId: row.id,
+          summary: `${user.name} hat den Maschinentyp ${row.code} angelegt.`,
+        },
+      });
+      return row;
+    });
+    revalidatePath("/change-requests/new");
+    revalidatePath("/change-requests");
+    return {
+      machineType: { id: created.id, label: created.code, active: true },
+      notice: `„${created.code}" wurde angelegt und ausgewählt.`,
+    };
+  } catch {
+    // Zwei Personen gleichzeitig: der Code ist eindeutig, einer gewinnt, wir nehmen dessen Zeile.
+    const existing = await db.machineType.findUnique({ where: { code }, select: { id: true, code: true, active: true } });
+    if (existing?.active) return { machineType: { id: existing.id, label: existing.code, active: true } };
+    return { error: "Der Maschinentyp konnte nicht angelegt werden. Bitte erneut versuchen." };
+  }
 }

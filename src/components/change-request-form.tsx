@@ -2,12 +2,15 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, Plus, X } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   saveChangeRequest,
   type FormState,
+  type MachineTypeActionState,
+  createMachineType,
 } from "@/modules/change-requests/actions";
+import { machineCodeFingerprint, normalizeMachineCode } from "@/modules/change-requests/machine-type-catalog";
 import { Card } from "@/components/ui/card";
 import { AssistedTextField } from "@/components/assisted-text-field";
 import { AttachmentPicker } from "@/components/attachment-picker";
@@ -59,10 +62,21 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
       description: "",
     },
   });
+  // Ein eben angelegter Typ muss sofort auswählbar sein, also lebt die Liste im Zustand.
+  const [machineOptions, setMachineOptions] = useState(machineTypes);
   const selected = useWatch({ control, name: "reasonIds" }) ?? [];
   const selectedMachineTypeIds = useWatch({ control, name: "machineTypeIds" }) ?? [];
   const articleNumber = useWatch({ control, name: "articleNumber" });
-  const selectedMachines = machineTypes.filter((machine) => selectedMachineTypeIds.includes(machine.id));
+  const selectedMachines = machineOptions.filter((machine) => selectedMachineTypeIds.includes(machine.id));
+  const addMachineType = async (code: string): Promise<MachineTypeActionState> => {
+    const result = await createMachineType(code);
+    const created = result.machineType;
+    if (!created) return result;
+    setMachineOptions((current) => (current.some(({ id }) => id === created.id) ? current : [...current, created]));
+    if (!selectedMachineTypeIds.includes(created.id))
+      setValue("machineTypeIds", [...selectedMachineTypeIds, created.id], { shouldDirty: true });
+    return result;
+  };
   const writingContext = [
     selectedMachines.length ? `Maschinentypen: ${selectedMachines.map(({ label }) => label).join(", ")}` : "",
     articleNumber ? `Artikel-/Baugruppennummer: ${articleNumber}` : "",
@@ -126,7 +140,8 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
           <div>
             <span className="text-sm font-medium">Maschinentyp(en) *</span>
             <MachineTypeMultiSelect
-              options={machineTypes}
+              options={machineOptions}
+              onCreate={addMachineType}
               selectedIds={selectedMachineTypeIds}
               onChange={(machineTypeIds) => setValue("machineTypeIds", machineTypeIds, { shouldDirty: true })}
             />
@@ -247,20 +262,47 @@ export function ChangeRequestForm({ machineTypes, reasons, initial, defaultAppli
     </form>
   );
 }
-function MachineTypeMultiSelect({ options, selectedIds, onChange }: { options: { id: string; label: string; active: boolean }[]; selectedIds: string[]; onChange: (ids: string[]) => void }) {
+function MachineTypeMultiSelect({ options, selectedIds, onChange, onCreate }: { options: { id: string; label: string; active: boolean }[]; selectedIds: string[]; onChange: (ids: string[]) => void; onCreate: (code: string) => Promise<MachineTypeActionState> }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [pending, setPending] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: "error" | "notice"; text: string } | null>(null);
   const selected = options.filter(({ id }) => selectedIds.includes(id));
-  const visible = options.filter(({ label }) => label.toLocaleLowerCase("de-CH").includes(search.trim().toLocaleLowerCase("de-CH")));
+  const term = search.trim();
+  const visible = options.filter(({ label }) => label.toLocaleLowerCase("de-CH").includes(term.toLocaleLowerCase("de-CH")));
   const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((value) => value !== id) : [...selectedIds, id]);
+  // Dieselbe Erkennung wie auf dem Server, damit das Anlegen gar nicht erst angeboten wird,
+  // wenn die Maschine unter anderer Schreibweise längst im Katalog steht.
+  const proposed = normalizeMachineCode(term);
+  const fingerprint = machineCodeFingerprint(proposed);
+  const known = options.some(({ label }) => machineCodeFingerprint(label) === fingerprint);
+  const offerCreate = Boolean(fingerprint) && !known;
+  const create = async () => {
+    setPending(true);
+    setFeedback(null);
+    try {
+      const result = await onCreate(term);
+      if (result.error) setFeedback({ kind: "error", text: result.error });
+      else {
+        setSearch("");
+        if (result.notice) setFeedback({ kind: "notice", text: result.notice });
+      }
+    } catch {
+      setFeedback({ kind: "error", text: "Der Maschinentyp konnte nicht angelegt werden. Bitte erneut versuchen." });
+    } finally {
+      setPending(false);
+    }
+  };
   return <div className="relative mt-1.5">
     <div className="flex min-h-11 flex-wrap gap-2 rounded-md border border-slate-300 bg-white p-2">
       {selected.map((machine) => <span key={machine.id} className="inline-flex min-h-8 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-sm font-medium text-[#175f91]">{machine.label}{!machine.active && <span className="text-xs text-slate-500">historisch</span>}<button type="button" aria-label={`${machine.label} entfernen`} onClick={() => toggle(machine.id)} className="grid size-6 place-items-center rounded-full hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-[#175f91]"><X className="size-3.5" aria-hidden="true" /></button></span>)}
       <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-8 flex-1 items-center justify-between gap-2 rounded px-2 text-left text-sm text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#175f91]"><span>{selected.length ? "Maschine hinzufügen…" : "Maschine auswählen…"}</span><ChevronDown className="size-4 shrink-0" aria-hidden="true" /></button>
     </div>
     {open && <div role="dialog" aria-label="Maschinentypen auswählen" className="absolute z-30 mt-2 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
-      <input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Maschinentyp suchen" placeholder="Maschinentyp suchen…" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+      <input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Maschinentyp suchen oder neu eingeben" placeholder="Maschinentyp suchen oder neu eingeben…" className="mb-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" />
       <div className="max-h-64 overflow-y-auto">{visible.map((machine) => { const checked = selectedIds.includes(machine.id); const unavailable = !machine.active && !checked; return <button key={machine.id} type="button" disabled={unavailable} onClick={() => toggle(machine.id)} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"><span className={`grid size-5 place-items-center rounded border ${checked ? "border-[#175f91] bg-[#175f91] text-white" : "border-slate-300"}`}>{checked && <Check className="size-3.5" aria-hidden="true" />}</span><span>{machine.label}{!machine.active ? " (historisch)" : ""}</span></button> })}{!visible.length && <p className="p-3 text-sm text-slate-500">Keine Maschinentypen gefunden.</p>}</div>
+      {offerCreate && <button type="button" onClick={create} disabled={pending} className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-md border border-dashed border-[#175f91] px-3 text-left text-sm font-semibold text-[#175f91] hover:bg-blue-50 disabled:opacity-60"><Plus className="size-4 shrink-0" aria-hidden="true" /><span>{pending ? "Wird angelegt…" : `„${proposed}" neu anlegen`}</span></button>}
+      {feedback && <p role="status" className={`mt-2 text-sm ${feedback.kind === "error" ? "text-red-700" : "text-emerald-700"}`}>{feedback.text}</p>}
       <button type="button" onClick={() => setOpen(false)} className="mt-3 min-h-11 w-full rounded-md bg-[#175f91] px-4 text-sm font-semibold text-white">Auswahl übernehmen</button>
     </div>}
   </div>;
